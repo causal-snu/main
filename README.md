@@ -13,3 +13,10 @@
   - Raw data 전처리하고 적용하기
 - [논문](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2807890/pdf/nihms153529.pdf) 읽기
 - 강의록: propensity score 내용 읽기
+
+## 스터디 일정
+- 2022-10-31-월-4시반
+  - 앞으로 뭘 해야하는지 확인하고 과정 정리
+
+- 2022-11-9-수-3시
+  - 각자 공부해온 
