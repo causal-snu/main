@@ -8,12 +8,26 @@
   
 ## 스터디 과정
 - 코드
-  - 블로그에 나온 propensity score 추정 그대로 따라서 해보고 공부해오기
+  - 블로그에 나온 propensity score matching
   - Logistic regression 대신 CART, Random forest 적용하기
   - Raw data 전처리하고 적용하기
 - [논문](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2807890/pdf/nihms153529.pdf) 읽기
 - 강의록: propensity score 내용 읽기
+- [propensity score matching&weighting in python](https://matheusfacure.github.io/python-causality-handbook/11-Propensity-Score.html)
+- [A Practical Guide for Using Propensity Score Weighting in R](https://www.math.umd.edu/~slud/s818M-MissingData/PropensityScoreWeightingR.pdf)
+--------------------------
+## Propensity score analysis 요약
+  - propensity score를 활용하는 방식에 따라 분류.
+1. propensity score weighting
+  - treatment group과 control group의 propensity score가 같아지도록 weight를 부여.
+  - Inverse probability of treatment weighting, IPW.
 
+2. propensity score matching
+  - treatment group의 unit과 비슷한 propensity score를 가진 control group unit을 매칭.
+  
+3. propensity score subclassification
+  - treatment group과 control group의 unit들을 propensity score가 비슷한 k개의 집단으로 subclassification.
+----------------------------
 ## 스터디 일정
 - 2022-10-31-월-4시반
   - 앞으로 뭘 해야하는지 확인하고 과정 정리
