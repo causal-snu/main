@@ -15,6 +15,10 @@
 - 강의록: propensity score 내용 읽기
 - [propensity score matching&weighting in python](https://matheusfacure.github.io/python-causality-handbook/11-Propensity-Score.html)
 - [A Practical Guide for Using Propensity Score Weighting in R](https://www.math.umd.edu/~slud/s818M-MissingData/PropensityScoreWeightingR.pdf)
+- [cart 이용한 ps score 추정](https://arxiv.org/pdf/1807.09462.pdf)
+- [propensity score weighting](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3069059/pdf/pone.0018174.pdf
+)
+- 
 --------------------------
 ## Propensity score analysis 요약
   - propensity score를 활용하는 방식에 따라 분류.
