@@ -18,7 +18,7 @@
 - [cart 이용한 ps score 추정](https://arxiv.org/pdf/1807.09462.pdf)
 - [propensity score weighting](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3069059/pdf/pone.0018174.pdf
 )
-- 
+- [propensity score github](https://github.com/ygeunkim/propensityml)
 --------------------------
 ## Propensity score analysis 요약
   - propensity score를 활용하는 방식에 따라 분류.
