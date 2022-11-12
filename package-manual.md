@@ -14,23 +14,23 @@ library(propensityml)
 ```
 
 ## weighting.R 함수 내용 정리
-add_propensity(data, object = NULL, formula = NULL, method = c("logit", "rf", "cart", "SVM"), var = "propensity", mc_col = NULL, sc_col = NULL, parallel = FALSE, ...)
+<span style="color:blue">add_propensity</span>(data, object = NULL, formula = NULL, method = c("logit", "rf", "cart", "SVM"), var = "propensity", mc_col = NULL, sc_col = NULL, parallel = FALSE, ...)
  - Propensity score를 원래 dataframe에 new column으로 추가해주는 함수. 
  - method를 뭘로 지정하는지에 따라 어떤 모델 기반으로 propensity score를 추정할지 정할 수 있음.
 
-add_ipw_wt(data, treatment, trt_indicator = 1, object = NULL, formula = NULL, method = c("logit", "rf", "cart", "SVM"), mc_col = NULL, sc_col = NULL, parallel = FALSE, ...
+<span style="color:blue">add_ipw_wt</span>(data, treatment, trt_indicator = 1, object = NULL, formula = NULL, method = c("logit", "rf", "cart", "SVM"), mc_col = NULL, sc_col = NULL, parallel = FALSE, ...
  - Data를 넣으면 ATE_ipw의 weight를 추정해주고 이를 dataframe의 new column으로 추가해주는 함수. 
  - 위의 propensity score추정하는 함수가 들어가있어서 ps 추정까지 자동으로 해준다. 
  - 따라서 이 함수의 method도 위와 같이 propensity score 추정에 쓰이는 모델을 고르는 parameter임.
 
-compute_ipw(data, treatment, treat_indicator, outcome, method= ...)
+<span style="color:blue">compute_ipw</span>(data, treatment, treat_indicator, outcome, method= ...)
  - 아예 data와 treatment, outcome 넣으면 ATE_ipw를 추정해주는 함수. 
  - 위의 add_propensity 와 add_ipw_wt 가 들어가므로 두 개의 new column 생성, output은 ATE_ipw.
 
-compute_sipw (data, treatment, treat_indicator, outcome, method= ...)
+<span style="color:blue">compute_sipw </span>(data, treatment, treat_indicator, outcome, method= ...)
  - 위와 input 같고 output이 ATE_sipw임.
 
-add_weighting(data, treatment, treat_indicator, outcome, method= ...)
+<span style="color:blue">add_weighting</span>(data, treatment, treat_indicator, outcome, method= ...)
  - ATE_ inverse probability treatment weighting 줄여서 ATE_iptw 새로운 개념 등장. 이건 안배운 내용인듯. 
  - 이 때 필요한 weight를 계산해줌. 
  - ipw와 거의 똑같은데 t/ps - (1-t)/(1-ps) 로 중간 부호가 마이너스로 바뀜.
@@ -38,43 +38,43 @@ add_weighting(data, treatment, treat_indicator, outcome, method= ...)
 ## propensity.R 함수 내용 정리
 ### propensity score를 위한 모델 적합
 
-ps_glm(formula, data, ...)
+<span style="color:blue">ps_glm</span>(formula, data, ...)
  - propensity score 추정 전에 y를 treatment로 하는 **logistic regression** 모델에 데이터를 적합하는 합수.
  - 결과로 glm 함수 돌린 값을 result로 반환
 
-ps_rf(formula, data, ...)
+<span style="color:blue">ps_rf</span>(formula, data, ...)
  - 위와 같은데 이번에는 y를 treatment로 하는 **random forest** 모델에 데이터를 적합하는 함수.
 
-ps_cart(formula, data, ...)
+<span style="color:blue">ps_cart</span>(formula, data, ...)
  - 위와 같은데 이번에는 y를 treatment로 하는 **classification tree** 모델에 데이터를 적합하는 함수.
 
-ps_svm(formula, data, scale = FALSE, kernel = c("radial", "linear", "polynomial", "sigmoid"), cost = 1, gamma, .....)
+<span style="color:blue">ps_svm</span>(formula, data, scale = FALSE, kernel = c("radial", "linear", "polynomial", "sigmoid"), cost = 1, gamma, .....)
  - 위와 같은데 이번에는 y를 treatment로 하는 **support vestor machine** 모델에 데이터를 적합하는 함수.
 
-plot_cp(object, ...)
+<span style="color:blue">plot_cp</span>(object, ...)
  - Before pruning, plot complexity parameter from CART.
 
-ps_prune(object,cp, ...)
+<span style="color:blue">ps_prune</span>(object,cp, ...)
  - prunes the result of \code{\link{ps_cart}}. **prune 한다는게 뭔지 아직 모르겠음 **
 
 ### propensity score 추정
 
-estimate_ps(object, ...)
+<span style="color:blue">estimate_ps</span>(object, ...)
  - object로는 위의 모델 적합한 변수가 들어감.
  - object$name== "glm" or "rf" or "cart" or "SVM" 
  - return 으로 모델 적합 후 predict 한 값이 나옴.
 
 ## evaluate.R 함수 내용 정리
-compute_balance <- function(data, col_name = "balance", treatment, trt_indicator = 1, outcome, exclude = NULL)
+<span style="color:blue">compute_balance</span>(data, col_name = "balance", treatment, trt_indicator = 1, outcome, exclude = NULL)
  - gives covariate balance summary
 
-compute_moment <- function(x)
+compute_moment(x)
  - compute_balance 부속 함수
 
-tidy_moment <- function(data, treatment, with_melt = NULL, col_exclude)
+tidy_moment(data, treatment, with_melt = NULL, col_exclude)
  - compute_balance 부속 함수
  
-compute_asam <- function(data, treatment, trt_indicator = 1, outcome, exclude = NULL,
+<span style="color:blue">compute_asam</span>(data, treatment, trt_indicator = 1, outcome, exclude = NULL,
                          object = NULL, formula = NULL, method = c("logit", "rf", "cart", "SVM"), weighting = c("IPW", "SIPW"), mc_col = NULL, sc_col = NULL, parallel = FALSE, ...)
  - computes average standardized absolute mean distance (ASAM)
                      
