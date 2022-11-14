@@ -50,15 +50,18 @@ library(propensityml)
 
 <span style="color:blue">ps_svm</span>(formula, data, scale = FALSE, kernel = c("radial", "linear", "polynomial", "sigmoid"), cost = 1, gamma, .....)
  - 위와 같은데 이번에는 y를 treatment로 하는 **support vestor machine** 모델에 데이터를 적합하는 함수.
- - 저희가 하는 모델중에 포함 안시켜도 되지 않나요?? 
+ > 저희가 하는 모델중에 포함 안시켜도 되지 않나요?? 
+ > A: 맞아요.
 
 <span style="color:blue">plot_cp</span>(object, ...)
  - Before pruning, plot complexity parameter from CART.
- - plot_cp에 대한 부분이 이해가 안되는데 설명해주세요~ 이것도 pruning을 위한 과정인데 저희 내용에 포함 안시켜도 되지 않나요?
+ > plot_cp에 대한 부분이 이해가 안되는데 설명해주세요~ 이것도 pruning을 위한 과정인데 저희 내용에 포함 안시켜도 되지 않나요?
+ > A: prune한다는건 CART가 의사결정나무인데 의사결정나무의 최대 단점이 과적합입니다. 그래서 가지 중에서(의사결정 node 중에서) 너무 과적합하는 의사결정 가지를 잘라서 가지치기하는걸 말합니다. 그래서 과적합을 방지할 수 있고 보통은 교차검증한 오류를 제일 줄이는 방향으로 가지치기를 진행합니다.
 
 <span style="color:blue">ps_prune</span>(object,cp, ...)
- - prunes the result of \code{\link{ps_cart}}. **prune 한다는게 뭔지 아직 모르겠음 **
- - 이 부분은 안해도 될것 같은데요?? 
+ - prunes the result of \code{\link{ps_cart}}.
+ > **prune 한다는게 뭔지 아직 모르겠음 **
+ > 이 부분은 안해도 될것 같은데요?? 
 
 ### propensity score 추정
 
@@ -66,9 +69,15 @@ library(propensityml)
  - object로는 위의 모델 적합한 변수가 들어감.
  - object$name== "glm" or "rf" or "cart" or "SVM" 
  - return 으로 모델 적합 후 predict 한 값이 나옴.
- - 함수에서 trt_lev가 무엇인가요? type='prob' 는 ?? 
- - #propensity socre model class의 'promod' class는 머야요
-ㅇ
+ 
+ > 함수에서 trt_lev가 무엇인가요? type='prob' 는 ?? 
+ > A: type='prob'는 예측 이후 matrix of class probabilities를 반환하는 argument입니다. 'prob'도 있고 'response'도 있는데 glm의 예측된 확률을 반환하는 argument가 'response'이고 다른 것들은 'prob' 입니다.
+ > A: trt_level은 말 그대로 treat가 1인 행의 class값입니다.
+ 
+ > #propensity socre model class의 'promod' class는 머야요
+ > A: 이거 쓰면 굳이 저렇게 계산 안해도 ps score를 반환해준다고 합니다. 
+
+
 ## evaluate.R 함수 내용 정리
 <span style="color:blue">compute_balance</span>(data, col_name = "balance", treatment, trt_indicator = 1, outcome, exclude = NULL)
  - gives covariate balance summary
