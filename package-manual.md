@@ -68,7 +68,7 @@ library(propensityml)
  - return 으로 모델 적합 후 predict 한 값이 나옴.
  - 함수에서 trt_lev가 무엇인가요? type='prob' 는 ?? 
  - #propensity socre model class의 'promod' class는 머야요
-
+ㅇ
 ## evaluate.R 함수 내용 정리
 <span style="color:blue">compute_balance</span>(data, col_name = "balance", treatment, trt_indicator = 1, outcome, exclude = NULL)
  - gives covariate balance summary
