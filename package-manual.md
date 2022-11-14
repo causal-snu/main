@@ -54,7 +54,7 @@ library(propensityml)
 
 <span style="color:blue">plot_cp</span>(object, ...)
  - Before pruning, plot complexity parameter from CART.
- - plot_cp에 대한 부분이 이해가 안되는데 설명해주세요~ 
+ - plot_cp에 대한 부분이 이해가 안되는데 설명해주세요~ 이것도 pruning을 위한 과정인데 저희 내용에 포함 안시켜도 되지 않나요?
 
 <span style="color:blue">ps_prune</span>(object,cp, ...)
  - prunes the result of \code{\link{ps_cart}}. **prune 한다는게 뭔지 아직 모르겠음 **
