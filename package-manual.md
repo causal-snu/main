@@ -50,12 +50,15 @@ library(propensityml)
 
 <span style="color:blue">ps_svm</span>(formula, data, scale = FALSE, kernel = c("radial", "linear", "polynomial", "sigmoid"), cost = 1, gamma, .....)
  - 위와 같은데 이번에는 y를 treatment로 하는 **support vestor machine** 모델에 데이터를 적합하는 함수.
+ - 저희가 하는 모델중에 포함 안시켜도 되지 않나요?? 
 
 <span style="color:blue">plot_cp</span>(object, ...)
  - Before pruning, plot complexity parameter from CART.
+ - plot_cp에 대한 부분이 이해가 안되는데 설명해주세요~ 
 
 <span style="color:blue">ps_prune</span>(object,cp, ...)
  - prunes the result of \code{\link{ps_cart}}. **prune 한다는게 뭔지 아직 모르겠음 **
+ - 이 부분은 안해도 될것 같은데요?? 
 
 ### propensity score 추정
 
