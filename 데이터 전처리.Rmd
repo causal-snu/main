@@ -1,0 +1,98 @@
+---
+title: "Causal_project"
+output: html_document
+date: '2022-11-15'
+---
+
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+
+```{r}
+#dataset ºÒ·¯¿À±â
+raw_data <- read.sas7bdat("/Users/kyungseonlee/snu-causal/main/input/rawdata/HN20_ALL.sas7bdat")
+dim(raw_data) %>% head()
+raw_data %>% head(1)
+
+```
+
+
+```{r}
+column=c('BD1','DC2_dg','sex','age','DK8_dg','DK9_dg','DK4_dg')
+column2=c('BD1','DC2_dg','DK8_dg','DK9_dg','DK4_dg')
+
+df=raw_data[,column]
+df %>% head(7)
+
+df <- df[!(df$BD1 == 8 | df$BD1 ==9 ), ]
+df <- df[!(df$DC2_dg == 8 | df$DC2_dg ==9 ), ]
+df <- df[!(df$DK8_dg == 8 | df$DK8_dg ==9 ), ]
+df <- df[!(df$DK9_dg == 8 | df$DK9_dg ==9 ), ]
+df <- df[!(df$DK4_dg == 8 | df$DK4_dg ==9 ), ]
+
+df %>% head(7)
+```
+
+
+```{r}
+df$BD1<-df$BD1-1
+df$sex<-df$sex-1
+
+table(df$BD1)
+```
+```{r}
+linear_model=lm(BD1~., data=df)
+
+?add_weighting
+```
+
+### LaLonde dataset
+```{r}
+
+haven::read_data("http://www.nber.org/~rdehejia/data/nsw_dw.dta")
+
+lalonde::nsw_dw
+
+data(LaLonde)
+
+print(data)
+
+y <- LaLonde$outcome
+
+trt <- LaLonde$treat
+
+x.varnames <- c("age", "educ", "black", "hisp", "white",
+                "marr", "nodegr", "log.re75", "u75")
+
+# covariates
+data.x <- LaLonde[, x.varnames]
+
+
+
+# construct design matrix (with no intercept)
+x <- model.matrix(~ -1 + ., data = data.x)
+
+const.propens <- function(x, trt)
+{
+    mean.trt <- mean(trt == "Trt")
+    rep(mean.trt, length(trt))
+}
+
+subgrp_fit_w <- fit.subgroup(x = x, y = y, trt = trt,
+    loss = "logistic_loss_lasso",
+    propensity.func = const.propens,
+    cutpoint = 0,
+    type.measure = "auc",
+    nfolds = 10)
+
+summary(subgrp_fit_w)
+```
+
