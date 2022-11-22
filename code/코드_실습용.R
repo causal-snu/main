@@ -52,4 +52,5 @@ ipw_wt_cart <- add_ipw_wt(chemical, treatment = 'poisox', trt_indicator = 1, obj
 
 ##3 Estimation of Inverse Probability Weighting : ipw 추정
 compute_ipw_glm <- compute_ipw(ipw_wt_glm, treatment = 'poisox', trt_indicator = 1, outcome = 'mortal', weight = 'ipw_wt',
-                               object = fit1, formula = poisox ~ age + sex, method = 'logit') ##아 여기서 막히네....빡친다....
+                               object = fit1, formula = poisox ~ age + sex, method = 'logit') 
+
