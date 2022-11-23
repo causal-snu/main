@@ -28,7 +28,7 @@ df0 %>% head()
 
 #df1 has factor values.
 df1=df0
-df1[2:4]=lapply(df1[2:4],factor)
+df1[2:3]=lapply(df1[2:3],factor)
 df1 %>% head()
 ```
 ## 1-2. Propensity score estimation- logistic regression, random Forest, CART
@@ -72,21 +72,34 @@ print(e_hat %>% head())
 #c. propensity score estimation- CART
 #install.packages("rpart")
 library(rpart)
-cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
-summary(cart)
 
-df0_c=df0
-cart_ps=predict(cart)
-df0_c["propensity score"]=cart_ps
-df0_c %>% head()
+# cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
+# summary(cart)
+# 
+# df0_c=df0
+# cart_ps=predict(cart)
+# df0_c["propensity score"]=cart_ps
+# df0_c %>% head()
+# 
+# df1_c=df1
 
 df1_c=df1
-cart=rpart(poisox~ age+sex, data=df1 ,method='class')
-summary(cart)
+cart2=rpart(poisox~ age+sex, data=df1_c ,method='class')
+summary(cart2)
 
-cart_ps=predict(cart)
-df1["propensity score2"]=cart_ps
-df1 %>% head()
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df1_c %>% head()
+for (i in 1:nrow(df1) ){
+  if (df1$poisox[i]=="1"){
+    df1_c[i,"ps2"]=cart_ps2[i,"1"]
+    df1_c[i,"trt"]=1}
+  else{
+    df1_c[i,"ps2"]=cart_ps2[i,"0"]
+    df1_c[i,"trt"]=0
+  }
+}
+df1_c %>% head()
 
 ```
 
@@ -100,8 +113,32 @@ df1["propensity score"]=cart_ps2
 df1 %>% head()
 
 ```
+```{r}
+# d. Add ipw_weight & calculate ATE_ipw
+df1_c %>% head()
+# for (i in 1:nrow(df1) ){
+#   if (df1$poisox[i]=="1"){
+#     df1[i,"propensity score2"]=cart_ps2[i,"0"]}
+#   else{df1[i,"propensity score2"]=cart_ps2[i,"1"]}
+# }
+zi=df1_c$trt
+yi=df1_c$mortal
+e=df1_c$ps2
 
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
 
+ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw
+```
+
+```{r}
+# d. calculate ATE_sipw
+
+ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw
+
+```
 
 
 # 2. Korea National Health and Nutrition Examination Survey Dataset

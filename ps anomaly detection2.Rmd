@@ -1,0 +1,261 @@
+---
+title: "Causal_project"
+output: html_document
+date: '2022-11-15'
+---
+## Install packages & library
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+# 1. Chemical Dataset
+## 1-1. Data reading
+```{r}
+df<-read.table('/Users/kyungseonlee/Desktop/causal/poisox.txt')
+colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
+df%>% head()
+
+#df0 has integer values.
+df0=df[c(1,2,4,6)]
+df0 %>% head()
+
+#df1 has factor values.
+df1=df0
+df1[2:3]=lapply(df1[2:3],factor)
+df1 %>% head()
+```
+## 1-2. Propensity score estimation- logistic regression, random Forest, CART
+```{r}
+# a. propensity score estimation-logistic regression
+log_reg_ps=glm(poisox~ age+sex, family = "binomial", data=df)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+#exp(logit_e_hat)
+e_hat=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(e_hat %>% head())
+```
+
+```{r}
+# a-1. propensity score estimation-logistic regression by package
+
+log_reg_ps2=ps_glm(poisox~ age+sex, data=df)
+e_hat2=estimate_ps(log_reg_ps2)
+e_hat2 %>% head()
+
+print(sum(e_hat!=e_hat2))
+
+```
+
+```{r}
+# b.  propensity score estimation- Random Forest
+#install.packages("randomForest")
+library(randomForest)
+rf=randomForest(poisox~ age+sex, data=df)
+e_hat=predict(rf)
+print(e_hat %>% head())
+
+```
+
+```{r}
+# b.  propensity score estimation- Random Forest by package
+```
+
+```{r}
+#c. propensity score estimation- CART
+#install.packages("rpart")
+library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
+# summary(cart)
+# 
+# df0_c=df0
+# cart_ps=predict(cart)
+# df0_c["propensity score"]=cart_ps
+# df0_c %>% head()
+# 
+# df1_c=df1
+
+df1_c=df1
+cart2=rpart(poisox~ age+sex, data=df1_c ,method='class')
+summary(cart2)
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df1_c %>% head()
+for (i in 1:nrow(df1) ){
+  if (df1$poisox[i]=="1"){
+    df1_c[i,"ps2"]=cart_ps2[i,"1"]
+    df1_c[i,"trt"]=1}
+  else{
+    df1_c[i,"ps2"]=cart_ps2[i,"0"]
+    df1_c[i,"trt"]=0
+  }
+}
+df1_c %>% head()
+
+```
+
+
+```{r}
+#c. propensity score estimation- CART by package
+
+cart2=ps_cart(poisox ~ age + sex, data = df1)
+cart_ps2=estimate_ps(cart2)
+df1["propensity score"]=cart_ps2
+df1 %>% head()
+
+```
+```{r}
+# d. Add ipw_weight & calculate ATE_ipw
+df1_c %>% head()
+# for (i in 1:nrow(df1) ){
+#   if (df1$poisox[i]=="1"){
+#     df1[i,"propensity score2"]=cart_ps2[i,"0"]}
+#   else{df1[i,"propensity score2"]=cart_ps2[i,"1"]}
+# }
+zi=df1_c$trt
+yi=df1_c$mortal
+e=df1_c$ps2
+
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
+
+ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw
+```
+
+```{r}
+# d. calculate ATE_sipw
+
+ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw
+
+```
+
+
+# 2. Korea National Health and Nutrition Examination Survey Dataset
+## 2-1. Data reading
+```{r}
+
+raw_data <- read.sas7bdat("/Users/kyungseonlee/snu-causal/main/input/rawdata/HN20_ALL.sas7bdat")
+dim(raw_data) %>% head()
+#raw_data %>% head(1)
+
+```
+
+# 2-2. Data preprocessing
+```{r}
+column=c('BD1','DC2_dg','sex','age','DK8_dg','DK9_dg','DK4_dg')
+column2=c('BD1','DC2_dg','DK8_dg','DK9_dg','DK4_dg')
+
+df=raw_data[,column]
+df %>% head(7)
+
+df <- df[!(df$BD1 == 8 | df$BD1 ==9 ), ]
+df <- df[!(df$DC2_dg == 8 | df$DC2_dg ==9 ), ]
+df <- df[!(df$DK8_dg == 8 | df$DK8_dg ==9 ), ]
+df <- df[!(df$DK9_dg == 8 | df$DK9_dg ==9 ), ]
+df <- df[!(df$DK4_dg == 8 | df$DK4_dg ==9 ), ]
+
+df %>% head(7)
+```
+
+
+```{r}
+df$BD1<-df$BD1-1
+df$sex<-df$sex-1
+df_c=df
+df_c["BD1_f"]=as.factor(df_c$BD1)
+
+table(df$DC2_dg)
+table(df$BD1)
+df[13:17,]
+```
+```{r}
+#c. propensity score estimation- CART
+#install.packages("rpart")
+#library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
+# summary(cart)
+# 
+# df0_c=df0
+# cart_ps=predict(cart)
+# df0_c["propensity score"]=cart_ps
+# df0_c %>% head()
+# 
+# df1_c=df1
+
+cart2=rpart(BD1~ .-DC2_dg-BD1_f, data=df_c ,method='class')
+summary(cart2)
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df_c %>% head()
+df_c$BD1[2]==1
+
+# for (i in 1:nrow(df_c) ){
+#   print((df_c$BD1[i]==1))
+#   if (df_c$BD1[i]==1){
+#     df_c[i,"ps"]=cart_ps2[i,"1"]
+#   }
+#   else{
+#     df_c[i,"ps"]=cart_ps2[i,"0"]
+#   }
+# }
+
+df1_c %>% head()
+
+```
+```
+
+### LaLonde dataset
+```{r}
+# 
+# haven::read_data("http://www.nber.org/~rdehejia/data/nsw_dw.dta")
+# 
+# lalonde::nsw_dw
+# 
+# data(LaLonde)
+# 
+# print(data)
+# 
+# y <- LaLonde$outcome
+# 
+# trt <- LaLonde$treat
+# 
+# x.varnames <- c("age", "educ", "black", "hisp", "white",
+#                 "marr", "nodegr", "log.re75", "u75")
+# 
+# # covariates
+# data.x <- LaLonde[, x.varnames]
+# 
+# 
+# 
+# # construct design matrix (with no intercept)
+# x <- model.matrix(~ -1 + ., data = data.x)
+# 
+# const.propens <- function(x, trt)
+# {
+#     mean.trt <- mean(trt == "Trt")
+#     rep(mean.trt, length(trt))
+# }
+# 
+# subgrp_fit_w <- fit.subgroup(x = x, y = y, trt = trt,
+#     loss = "logistic_loss_lasso",
+#     propensity.func = const.propens,
+#     cutpoint = 0,
+#     type.measure = "auc",
+#     nfolds = 10)
+# 
+# summary(subgrp_fit_w)
+```
+
