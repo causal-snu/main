@@ -20,13 +20,12 @@ est_ps_glm <- estimate_ps(fit1)
 summary(est_ps_glm)
 
 ##2 estimation of propensity score using random forest
-
 est_ps_rf <- estimate_ps(fit2)
 summary(est_ps_rf)
 
 
 ##3 estimation of propensity score using cart
-est_ps_cart <- estimate_ps(fit3)
+est_ps_cart <- estimate_ps(fit3) ##cart를 돌렸는데 값이 모두 같아??? 
 summary(est_ps_cart)
 
 
@@ -51,6 +50,24 @@ ipw_wt_rf <- add_ipw_wt(chemical, treatment = 'poisox', trt_indicator = 1, objec
 ipw_wt_cart <- add_ipw_wt(chemical, treatment = 'poisox', trt_indicator = 1, object = fit3, formula = poisox ~ age + sex, method = 'cart')
 
 ##3 Estimation of Inverse Probability Weighting : ipw 추정
-compute_ipw_glm <- compute_ipw(ipw_wt_glm, treatment = 'poisox', trt_indicator = 1, outcome = 'mortal', weight = 'ipw_wt',
-                               object = fit1, formula = poisox ~ age + sex, method = 'logit') 
+compute_ipw_glm <- compute_ipw(ipw_wt_glm, treatment = 'poisox', trt_indicator = 1, outcome = 'blood_diff', weight = 'ipw_wt',
+                               object = fit1, formula = poisox ~ age + sex, method = 'logit')
+compute_ipw_rf <- compute_ipw(ipw_wt_rf, treatment = 'poisox', trt_indicator = 1, outcome = 'blood_diff', weight = 'ipw_wt',
+                               object = fit2, formula = poisox ~ age + sex, method = 'rf') 
 
+
+compute_ipw_cart <- compute_ipw(data=ipw_wt_cart, treatment='poisox', trt_indicator = 1, outcome='blood_diff', weight = 'ipw_wt',
+                                  object = fit3, formula = poisox ~ age + sex, method = 'cart')
+
+compute_ipw_collect <- c(compute_ipw_glm, compute_ipw_rf, compute_ipw_cart)
+
+## sipw 추정
+compute_sipw_glm <- compute_sipw(ipw_wt_glm, treatment = 'poisox', trt_indicator = 1, outcome = 'blood_diff', weight = 'ipw_wt',
+                               object = fit1, formula = poisox ~ age + sex, method = 'logit')
+compute_sipw_rf <- compute_sipw(ipw_wt_rf, treatment = 'poisox', trt_indicator = 1, outcome = 'blood_diff', weight = 'ipw_wt',
+                              object = fit2, formula = poisox ~ age + sex, method = 'rf') 
+
+
+compute_sipw_cart <- compute_sipw(data=ipw_wt_cart, treatment='poisox', trt_indicator = 1, outcome='blood_diff', weight = 'ipw_wt',
+                                 object = fit3, formula = poisox ~ age + sex, method = 'cart')
+## 여기까지 했긴 했습니다... 코드파일로는 3.weighting.R에서 compute_sipw까지 ... 
