@@ -50,10 +50,11 @@ asam_glm_ipw <- compute_asam(data, treatment = 'poisox', trt_indicator = 1, outc
                              object = fit1, formula = poisox ~ age + sex, method = 'logit', weighting = 'IPW')
 
 asam_glm_sipw <- compute_asam(data = data, treatment = 'poisox', trt_indicator = 1, outcome = 'blood',
-                             object = fit1, formula = poisox ~ age + sex, method = 'logit', weighting = SIPW)
-
+                             object = fit1, formula = poisox ~ age + sex, method = 'logit', weighting = 'SIPW')
+asam_collect <- c(asam_glm_ipw, asam_glm_sipw)
+asam_collect ##엥 왜 똑같지??
 #-------------------------------------------------------------------------------#
-## randomforst 를 이용한 propensity score 추정... 전체적으로 결과를 보면 shit 하다
+## randomforest 를 이용한 propensity score 추정... 전체적으로 결과를 보면 shit 하다
 
 data
 fit2 <- ps_rf(poisox ~ age + sex, data = data)
