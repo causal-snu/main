@@ -456,13 +456,52 @@ library(randomForest)</code></pre>
 <pre><code>## The following object is masked from &#39;package:dplyr&#39;:
 ## 
 ##     combine</code></pre>
-<pre class="r"><code>rf=randomForest(poisox~ age+sex, data=df)</code></pre>
+<pre class="r"><code>rf=randomForest(poisox~ age+sex, data=df0)</code></pre>
 <pre><code>## Warning in randomForest.default(m, y, ...): The response has five or fewer
 ## unique values. Are you sure you want to do regression?</code></pre>
-<pre class="r"><code>e_hat=predict(rf)
-print(e_hat %&gt;% head())</code></pre>
+<pre class="r"><code>rf_ps=predict(rf)
+print(rf_ps %&gt;% head())</code></pre>
 <pre><code>##         1         2         3         4         5         6 
-## 0.6277720 0.8372182 0.7899455 0.6413625 0.8390882 0.8359231</code></pre>
+## 0.6410333 0.8346775 0.7861311 0.6434772 0.8391453 0.8333674</code></pre>
+<pre class="r"><code>df_rf=df0
+
+for (i in 1:nrow(df_rf) ){
+  if (df_rf$poisox[i]==1){
+    df_rf[i,&quot;ps&quot;]=rf_ps[i]
+  }
+  else{
+    df_rf[i,&quot;ps&quot;]=rf_ps[i]
+  }
+}
+df_rf %&gt;% head()</code></pre>
+<pre><code>##   age sex poisox mortal        ps
+## 1  31   0      1      0 0.6410333
+## 2  35   1      1      1 0.8346775
+## 3  27   1      0      0 0.7861311
+## 4  66   0      0      1 0.6434772
+## 5  54   1      1      0 0.8391453
+## 6  35   1      1      0 0.8333674</code></pre>
+<pre class="r"><code>#Random Forest- weighting
+
+zi=df_rf$poisox
+yi=df_rf$mortal
+e=df_rf$ps
+
+df_rf[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
+df_rf %&gt;% head()</code></pre>
+<pre><code>##   age sex poisox mortal        ps    ipw_wt
+## 1  31   0      1      0 0.6410333  1.559981
+## 2  35   1      1      1 0.8346775  1.198068
+## 3  27   1      0      0 0.7861311 -4.675761
+## 4  66   0      0      1 0.6434772 -2.804870
+## 5  54   1      1      0 0.8391453  1.191689
+## 6  35   1      1      0 0.8333674  1.199951</code></pre>
+<pre class="r"><code>ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw</code></pre>
+<pre><code>## [1] 0.04265945</code></pre>
+<pre class="r"><code>ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw</code></pre>
+<pre><code>## [1] 0.03811412</code></pre>
 <pre class="r"><code># b.  propensity score estimation- Random Forest by package</code></pre>
 <pre class="r"><code>#c. propensity score estimation- CART
 #install.packages(&quot;rpart&quot;)

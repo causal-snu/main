@@ -58,9 +58,40 @@ print(sum(e_hat!=e_hat2))
 # b.  propensity score estimation- Random Forest
 #install.packages("randomForest")
 library(randomForest)
-rf=randomForest(poisox~ age+sex, data=df)
-e_hat=predict(rf)
-print(e_hat %>% head())
+rf=randomForest(poisox~ age+sex, data=df0)
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+df_rf=df0
+
+for (i in 1:nrow(df_rf) ){
+  if (df_rf$poisox[i]==1){
+    df_rf[i,"ps"]=rf_ps[i]
+  }
+  else{
+    df_rf[i,"ps"]=rf_ps[i]
+  }
+}
+df_rf %>% head()
+
+#Random Forest- weighting
+
+zi=df_rf$poisox
+yi=df_rf$mortal
+e=df_rf$ps
+
+df_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_rf %>% head()
+
+ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw
+
+ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw
+
+
+
+
 
 ```
 
