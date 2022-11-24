@@ -462,7 +462,7 @@ library(randomForest)</code></pre>
 <pre class="r"><code>rf_ps=predict(rf)
 print(rf_ps %&gt;% head())</code></pre>
 <pre><code>##         1         2         3         4         5         6 
-## 0.6410333 0.8346775 0.7861311 0.6434772 0.8391453 0.8333674</code></pre>
+## 0.6342726 0.8399273 0.7948522 0.6467732 0.8397936 0.8366522</code></pre>
 <pre class="r"><code>df_rf=df0
 
 for (i in 1:nrow(df_rf) ){
@@ -475,12 +475,12 @@ for (i in 1:nrow(df_rf) ){
 }
 df_rf %&gt;% head()</code></pre>
 <pre><code>##   age sex poisox mortal        ps
-## 1  31   0      1      0 0.6410333
-## 2  35   1      1      1 0.8346775
-## 3  27   1      0      0 0.7861311
-## 4  66   0      0      1 0.6434772
-## 5  54   1      1      0 0.8391453
-## 6  35   1      1      0 0.8333674</code></pre>
+## 1  31   0      1      0 0.6342726
+## 2  35   1      1      1 0.8399273
+## 3  27   1      0      0 0.7948522
+## 4  66   0      0      1 0.6467732
+## 5  54   1      1      0 0.8397936
+## 6  35   1      1      0 0.8366522</code></pre>
 <pre class="r"><code>#Random Forest- weighting
 
 zi=df_rf$poisox
@@ -490,18 +490,18 @@ e=df_rf$ps
 df_rf[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
 df_rf %&gt;% head()</code></pre>
 <pre><code>##   age sex poisox mortal        ps    ipw_wt
-## 1  31   0      1      0 0.6410333  1.559981
-## 2  35   1      1      1 0.8346775  1.198068
-## 3  27   1      0      0 0.7861311 -4.675761
-## 4  66   0      0      1 0.6434772 -2.804870
-## 5  54   1      1      0 0.8391453  1.191689
-## 6  35   1      1      0 0.8333674  1.199951</code></pre>
+## 1  31   0      1      0 0.6342726  1.576609
+## 2  35   1      1      1 0.8399273  1.190579
+## 3  27   1      0      0 0.7948522 -4.874535
+## 4  66   0      0      1 0.6467732 -2.831042
+## 5  54   1      1      0 0.8397936  1.190769
+## 6  35   1      1      0 0.8366522  1.195240</code></pre>
 <pre class="r"><code>ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw</code></pre>
-<pre><code>## [1] 0.04265945</code></pre>
+<pre><code>## [1] 0.04212289</code></pre>
 <pre class="r"><code>ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw</code></pre>
-<pre><code>## [1] 0.03811412</code></pre>
+<pre><code>## [1] 0.0383831</code></pre>
 <pre class="r"><code># b.  propensity score estimation- Random Forest by package</code></pre>
 <pre class="r"><code>#c. propensity score estimation- CART
 #install.packages(&quot;rpart&quot;)
@@ -678,6 +678,7 @@ Dataset</h1>
 <pre class="r"><code>column=c(&#39;BD1&#39;,&#39;DC2_dg&#39;,&#39;sex&#39;,&#39;age&#39;,&#39;DK8_dg&#39;,&#39;DK9_dg&#39;,&#39;DK4_dg&#39;)
 column2=c(&#39;BD1&#39;,&#39;DC2_dg&#39;,&#39;DK8_dg&#39;,&#39;DK9_dg&#39;,&#39;DK4_dg&#39;)
 
+
 df=raw_data[,column]
 df %&gt;% head(7)</code></pre>
 <pre><code>##   BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg
@@ -688,7 +689,7 @@ df %&gt;% head(7)</code></pre>
 ## 5   8      8   1   4      8      8      8
 ## 6   1      9   1  60      9      9      9
 ## 7   2      0   2  58      0      0      0</code></pre>
-<pre class="r"><code>df &lt;- df[!(df$BD1 == 8 | df$BD1 ==9 ), ]
+<pre class="r"><code>df &lt;- df[!(df$BD1 == 8 | df$BD1 ==9 | is.na(df$BD1)), ]
 df &lt;- df[!(df$DC2_dg == 8 | df$DC2_dg ==9 ), ]
 df &lt;- df[!(df$DK8_dg == 8 | df$DK8_dg ==9 ), ]
 df &lt;- df[!(df$DK9_dg == 8 | df$DK9_dg ==9 ), ]
@@ -705,8 +706,6 @@ df %&gt;% head(7)</code></pre>
 ## 11   2      0   1  24      0      0      0</code></pre>
 <pre class="r"><code>df$BD1&lt;-df$BD1-1
 df$sex&lt;-df$sex-1
-df_c=df
-df_c[&quot;BD1_f&quot;]=as.factor(df_c$BD1)
 
 table(df$DC2_dg)</code></pre>
 <pre><code>## 
@@ -716,14 +715,113 @@ table(df$DC2_dg)</code></pre>
 <pre><code>## 
 ##    0    1 
 ##  604 4815</code></pre>
-<pre class="r"><code>df[13:17,]</code></pre>
-<pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg
-## 19   1      0   1  19      0      0      0
-## 21   1      0   0  67      0      0      0
-## 22   1      0   1  65      0      0      0
-## 23   1      0   1  39      0      0      0
-## 24   1      0   0  41      0      0      0</code></pre>
-<pre class="r"><code>#c. propensity score estimation- CART
+<pre class="r"><code>sum(is.na(df$BD1))</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>sum(is.na(df$DC2_dg))</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>dim(df)</code></pre>
+<pre><code>## [1] 5419    7</code></pre>
+<pre class="r"><code>which(df$BD1==0) %&gt;% head()</code></pre>
+<pre><code>## [1]  65  76  96 123 139 146</code></pre>
+<div id="ate-estimation---glm-random-forest-cart" class="section level2">
+<h2>ATE estimation - glm, random forest, cart</h2>
+<pre class="r"><code>#logsitic regression
+df_lo=df
+
+log_reg_ps=glm(BD1~ .-DC2_dg, family = &quot;binomial&quot;, data=df)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %&gt;% head())</code></pre>
+<pre><code>##        1        2        7        8        9       10 
+## 4.478827 2.780133 1.539090 3.368420 1.865680 5.719870</code></pre>
+<pre class="r"><code>lo_ps=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(lo_ps %&gt;% head())</code></pre>
+<pre><code>##         1         2         7         8         9        10 
+## 0.9887806 0.9415927 0.8233324 0.9667029 0.8659576 0.9967306</code></pre>
+<pre class="r"><code>for (i in 1:nrow(df_lo) ){
+  if (df_lo$BD1[i]==1){
+    df_lo[i,&quot;ps&quot;]=lo_ps[i]
+  }
+  else{
+    df_lo[i,&quot;ps&quot;]=lo_ps[i]
+  }
+}
+df_lo %&gt;% head()</code></pre>
+<pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg        ps
+## 1    1      0   0  39      0      0      0 0.9887806
+## 2    1      0   1  39      0      0      0 0.9415927
+## 7    1      0   1  58      0      0      0 0.8233324
+## 8    1      0   0  56      0      0      0 0.9667029
+## 9    1      0   1  53      0      0      0 0.8659576
+## 10   1      0   0  20      0      0      0 0.9967306</code></pre>
+<pre class="r"><code>#logistic regression - weighting
+
+zi=df_lo$BD1
+yi=df_lo$DC2_dg
+e=df_lo$ps
+
+df_lo[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
+df_lo %&gt;% head()</code></pre>
+<pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg        ps   ipw_wt
+## 1    1      0   0  39      0      0      0 0.9887806 1.011347
+## 2    1      0   1  39      0      0      0 0.9415927 1.062030
+## 7    1      0   1  58      0      0      0 0.8233324 1.214576
+## 8    1      0   0  56      0      0      0 0.9667029 1.034444
+## 9    1      0   1  53      0      0      0 0.8659576 1.154791
+## 10   1      0   0  20      0      0      0 0.9967306 1.003280</code></pre>
+<pre class="r"><code>ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log</code></pre>
+<pre><code>## [1] 0.001258102</code></pre>
+<pre class="r"><code>ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log</code></pre>
+<pre><code>## [1] 0.001260146</code></pre>
+<pre class="r"><code># random forest - propensity score estimation
+df_rf=df
+
+rf=randomForest(BD1~ .-DC2_dg, data=df)</code></pre>
+<pre><code>## Warning in randomForest.default(m, y, ...): The response has five or fewer
+## unique values. Are you sure you want to do regression?</code></pre>
+<pre class="r"><code>rf_ps=predict(rf)
+print(rf_ps %&gt;% head())</code></pre>
+<pre><code>##         1         2         7         8         9        10 
+## 0.9474360 0.9013992 0.8799678 0.9428430 0.8890257 0.9432840</code></pre>
+<pre class="r"><code>for (i in 1:nrow(df_rf) ){
+  if (df_rf$BD1[i]==1){
+    df_rf[i,&quot;ps&quot;]=rf_ps[i]
+  }
+  else{
+    df_rf[i,&quot;ps&quot;]=rf_ps[i]
+  }
+}
+df_rf %&gt;% head()</code></pre>
+<pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg        ps
+## 1    1      0   0  39      0      0      0 0.9474360
+## 2    1      0   1  39      0      0      0 0.9013992
+## 7    1      0   1  58      0      0      0 0.8799678
+## 8    1      0   0  56      0      0      0 0.9428430
+## 9    1      0   1  53      0      0      0 0.8890257
+## 10   1      0   0  20      0      0      0 0.9432840</code></pre>
+<pre class="r"><code>#Random Forest- weighting
+
+zi=df_rf$BD1
+yi=df_rf$DC2_dg
+e=df_rf$ps
+
+df_rf[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
+df_rf %&gt;% head()</code></pre>
+<pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg        ps   ipw_wt
+## 1    1      0   0  39      0      0      0 0.9474360 1.055480
+## 2    1      0   1  39      0      0      0 0.9013992 1.109386
+## 7    1      0   1  58      0      0      0 0.8799678 1.136405
+## 8    1      0   0  56      0      0      0 0.9428430 1.060622
+## 9    1      0   1  53      0      0      0 0.8890257 1.124827
+## 10   1      0   0  20      0      0      0 0.9432840 1.060126</code></pre>
+<pre class="r"><code>ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf</code></pre>
+<pre><code>## [1] 0.001262613</code></pre>
+<pre class="r"><code>ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf</code></pre>
+<pre><code>## [1] 0.001269103</code></pre>
+<pre class="r"><code>#propensity score estimation- CART
 #install.packages(&quot;rpart&quot;)
 #library(rpart)
 
@@ -737,11 +835,14 @@ table(df$DC2_dg)</code></pre>
 # 
 # df1_c=df1
 
+df_c=df
+df_c[&quot;BD1_f&quot;]=as.factor(df_c$BD1)
+
 cart2=rpart(BD1~ .-DC2_dg-BD1_f, data=df_c ,method=&#39;class&#39;)
 summary(cart2)</code></pre>
 <pre><code>## Call:
 ## rpart(formula = BD1 ~ . - DC2_dg - BD1_f, data = df_c, method = &quot;class&quot;)
-##   n=5419 (265 observations deleted due to missingness)
+##   n= 5419 
 ## 
 ##   CP nsplit rel error xerror xstd
 ## 1  0      0         1      0    0
@@ -767,68 +868,94 @@ cart_ps2 %&gt;% head()</code></pre>
 ## 8    1      0   0  56      0      0      0     1
 ## 9    1      0   1  53      0      0      0     1
 ## 10   1      0   0  20      0      0      0     1</code></pre>
-<pre class="r"><code>df_c$BD1[2]==1</code></pre>
-<pre><code>## [1] TRUE</code></pre>
-<pre class="r"><code># for (i in 1:nrow(df_c) ){
-#   print((df_c$BD1[i]==1))
-#   if (df_c$BD1[i]==1){
-#     df_c[i,&quot;ps&quot;]=cart_ps2[i,&quot;1&quot;]
-#   }
-#   else{
-#     df_c[i,&quot;ps&quot;]=cart_ps2[i,&quot;0&quot;]
-#   }
-# }
+<pre class="r"><code>df_c$BD1[95:100]</code></pre>
+<pre><code>## [1] 1 0 1 1 1 1</code></pre>
+<pre class="r"><code>#add propensity score
+for (i in 1:nrow(df_c) ){
 
-df1_c %&gt;% head()</code></pre>
-<pre><code>##   age sex poisox mortal    ps2 trt    ipw_wt
-## 1  31   0      1      0 0.7208   1  1.387347
-## 2  35   1      1      1 0.7208   1  1.387347
-## 3  27   1      0      0 0.2792   0 -1.387347
-## 4  66   0      0      1 0.2792   0 -1.387347
-## 5  54   1      1      0 0.7208   1  1.387347
-## 6  35   1      1      0 0.7208   1  1.387347</code></pre>
+  if (df_c$BD1[i]==1){
+    df_c[i,&quot;ps&quot;]=cart_ps2[i,&quot;1&quot;]
+  }
+  else{
+    df_c[i,&quot;ps&quot;]=cart_ps2[i,&quot;0&quot;]
+  }
+}
+
+#df_c[65:70,]</code></pre>
+<pre class="r"><code>#add weighting- CART
+zi=df_c$BD1
+yi=df_c$DC2_dg
+e=df_c$ps
+
+df_c[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
+df_c %&gt;% head()</code></pre>
+<pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg BD1_f        ps   ipw_wt
+## 1    1      0   0  39      0      0      0     1 0.8885403 1.125441
+## 2    1      0   1  39      0      0      0     1 0.8885403 1.125441
+## 7    1      0   1  58      0      0      0     1 0.8885403 1.125441
+## 8    1      0   0  56      0      0      0     1 0.8885403 1.125441
+## 9    1      0   1  53      0      0      0     1 0.8885403 1.125441
+## 10   1      0   0  20      0      0      0     1 0.8885403 1.125441</code></pre>
+<pre class="r"><code>#ATE_ipw
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart</code></pre>
+<pre><code>## [1] 0.001246106</code></pre>
+<pre class="r"><code>#ATE_sipw
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart</code></pre>
+<pre><code>## [1] 0.001246106</code></pre>
+<pre class="r"><code># ATE_hat is very small..</code></pre>
+<pre class="r"><code>rbind(ATE_ipw_log,ATE_sipw_log,ATE_ipw_rf,ATE_sipw_rf,ATE_ipw_cart, ATE_sipw_cart)</code></pre>
+<pre><code>##                      [,1]
+## ATE_ipw_log   0.001258102
+## ATE_sipw_log  0.001260146
+## ATE_ipw_rf    0.001262613
+## ATE_sipw_rf   0.001269103
+## ATE_ipw_cart  0.001246106
+## ATE_sipw_cart 0.001246106</code></pre>
 <pre><code>
 ### LaLonde dataset
 
 ```r
-# 
+#
 # haven::read_data(&quot;http://www.nber.org/~rdehejia/data/nsw_dw.dta&quot;)
-# 
+#
 # lalonde::nsw_dw
-# 
+#
 # data(LaLonde)
-# 
+#
 # print(data)
-# 
+#
 # y &lt;- LaLonde$outcome
-# 
+#
 # trt &lt;- LaLonde$treat
-# 
+#
 # x.varnames &lt;- c(&quot;age&quot;, &quot;educ&quot;, &quot;black&quot;, &quot;hisp&quot;, &quot;white&quot;,
 #                 &quot;marr&quot;, &quot;nodegr&quot;, &quot;log.re75&quot;, &quot;u75&quot;)
-# 
+#
 # # covariates
 # data.x &lt;- LaLonde[, x.varnames]
-# 
-# 
-# 
+#
+#
+#
 # # construct design matrix (with no intercept)
 # x &lt;- model.matrix(~ -1 + ., data = data.x)
-# 
+#
 # const.propens &lt;- function(x, trt)
 # {
 #     mean.trt &lt;- mean(trt == &quot;Trt&quot;)
 #     rep(mean.trt, length(trt))
 # }
-# 
+#
 # subgrp_fit_w &lt;- fit.subgroup(x = x, y = y, trt = trt,
 #     loss = &quot;logistic_loss_lasso&quot;,
 #     propensity.func = const.propens,
 #     cutpoint = 0,
 #     type.measure = &quot;auc&quot;,
 #     nfolds = 10)
-# 
+#
 # summary(subgrp_fit_w)</code></pre>
+</div>
 </div>
 
 
