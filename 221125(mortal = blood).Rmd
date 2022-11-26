@@ -1,0 +1,197 @@
+---
+title: "221125(mortal=blood)"
+author: "Yeonho_Jung"
+date: "2022-11-25"
+output: html_document
+---
+---
+title: "Causal_project"
+output: html_document
+date: '2022-11-15'
+---
+  ## Install packages & library
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+# 1. Chemical Dataset
+## 1-1. Data reading
+```{r}
+df<-read.table('./poisox.txt')
+colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
+df['blood_df'] = df$subseq - df$prior
+df%>% head()
+
+#df0 has integer values. : int값을 가진 sex, poisox
+df0=df[c(1,2,4,6,7)]
+df0 %>% head()
+
+#df1 has factor values. : facotr 형태의 sex, poisox
+df1=df0
+df1[2:3]=lapply(df1[2:3],factor)
+df1 %>% head()
+```
+## 1-2. Propensity score estimation- logistic regression, random Forest, CART
+```{r}
+# a. propensity score estimation-logistic regression
+log_reg_ps=glm(poisox~ age+sex, family = "binomial", data=df)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+#exp(logit_e_hat)
+e_hat=exp(logit_e_hat)/(1+exp(logit_e_hat))
+
+e_hat %>% head()
+
+
+df_glm <- df0
+for (i in 1:nrow(df_glm) ){
+  if (df_glm$poisox[i]==1){
+    df_glm[i,"ps"]=e_hat[i]
+  } #df_rf의 i번째 행, ps 열의 값이 rf_ps[i]로 지정된다.
+  else{
+    df_glm[i,"ps"]=e_hat[i]
+  }
+}
+df_glm%>%head()
+
+
+#Logistic Regression- weighting
+
+zi=df_glm$poisox
+yi=df_glm$blood_df
+e=df_glm$ps
+
+df_glm["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_glm %>% head()
+
+ATE_ipw_glm=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+
+ATE_sipw_glm=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+
+df_glm%>%head()
+```
+
+```{r}
+# a-1. propensity score estimation-logistic regression by package
+log_reg_ps2=ps_glm(poisox~ age+sex, data=df)
+e_hat2=estimate_ps(log_reg_ps2)
+e_hat2 %>% head()
+
+print(sum(e_hat!=e_hat2))
+#직접 계산한것과 package로 한것의 차이가 없다는 것을 찾았습니다! 
+
+```
+
+```{r}
+# b.  propensity score estimation- Random Forest
+#install.packages("randomForest")
+library(randomForest)
+rf=randomForest(poisox~ age+sex, data=df0) ## factor 형태의 변수를 사용, classification
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+df_rf=df0
+
+for (i in 1:nrow(df_rf) ){
+  if (df_rf$poisox[i]==1){
+    df_rf[i,"ps"]=rf_ps[i]
+  } #df_rf의 i번째 행, ps 열의 값이 rf_ps[i]로 지정된다.
+  else{
+    df_rf[i,"ps"]=rf_ps[i]
+  }
+}
+df_rf %>% head() #데이터셋에 ps 열을 추가한 data
+
+#Random Forest- weighting
+
+zi=df_rf$poisox
+yi=df_rf$blood_df
+e=df_rf$ps
+
+df_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_rf %>% head()
+
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+
+df_rf%>%head()
+
+```
+
+# b.  propensity score estimation- Random Forest by package
+
+
+```{r}
+#c. propensity score estimation- CART
+#install.packages("rpart")
+library(rpart)
+
+df_cart=df1
+cart=rpart(poisox~ age+sex, data=df_cart ,method='class')
+
+cart_ps=predict(cart)
+cart_ps %>% head()
+df_cart %>% head()
+for (i in 1:nrow(df_cart) ){
+  if (df_cart$poisox[i]=="1"){
+    df_cart[i,"ps"]=cart_ps[i,"1"]
+    df_cart[i,"trt"]=1}
+  else{
+    df_cart[i,"ps2"]=cart_ps[i,"0"]
+    df_cart[i,"trt"]=0
+  }
+}
+df_cart %>% head()
+```
+
+
+```{r}
+#c. propensity score estimation- CART by package
+
+cart2=ps_cart(poisox ~ age + sex, data = df1)
+cart_ps2=estimate_ps(cart2) 
+df1["propensity score"]=cart_ps2
+df1 %>% head()
+
+```
+```{r}
+# d. Add ipw_weight & calculate ATE_ipw
+df_cart %>% head()
+
+zi=df_cart$trt
+yi=df_cart$blood_df
+e=df_cart$`propensity score`
+
+
+df_cart["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_cart %>% head()
+
+```
+
+```{r}
+# d. calculate ATE_ipw and ATE_sipw
+
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+```
+
+```{r}
+#e. ATE_ipw and ATE_sipw of 'GLM, RF, CART'
+method_123 <- c('glm', 'rf', 'cart')
+
+ipw_sipw_method <- data.frame(method_123)
+ipw_sipw_method$ATE_ipw <- c(ATE_ipw_glm, ATE_ipw_rf, ATE_ipw_cart)
+ipw_sipw_method$ATE_sipw <- c(ATE_sipw_glm, ATE_sipw_rf, ATE_sipw_cart)
+
+ipw_sipw_method
+```

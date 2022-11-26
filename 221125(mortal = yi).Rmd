@@ -1,0 +1,434 @@
+---
+title: "Causal_project"
+output: html_document
+date: '2022-11-15'
+---
+  ## Install packages & library
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+# 1. Chemical Dataset
+## 1-1. Data reading
+```{r}
+df<-read.table('./poisox.txt')
+colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
+df%>% head()
+
+#df0 has integer values. : int값을 가진 sex, poisox
+df0=df[c(1,2,4,6)]
+df0 %>% head()
+
+#df1 has factor values. : facotr 형태의 sex, poisox
+df1=df0
+df1[2:3]=lapply(df1[2:3],factor)
+df1 %>% head()
+```
+## 1-2. Propensity score estimation- logistic regression, random Forest, CART
+```{r}
+# a. propensity score estimation-logistic regression
+log_reg_ps=glm(poisox~ age+sex, family = "binomial", data=df)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+#exp(logit_e_hat)
+e_hat=exp(logit_e_hat)/(1+exp(logit_e_hat))
+
+e_hat %>% head()
+
+
+df_glm <- df0
+for (i in 1:nrow(df_glm) ){
+  if (df_glm$poisox[i]==1){
+    df_glm[i,"ps"]=e_hat[i]
+  } #df_rf의 i번째 행, ps 열의 값이 rf_ps[i]로 지정된다.
+  else{
+    df_glm[i,"ps"]=e_hat[i]
+  }
+}
+df_glm%>%head()
+
+
+#Logistic Regression- weighting
+
+zi=df_glm$poisox
+yi=df_glm$mortal
+e=df_glm$ps
+
+df_glm["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_glm %>% head()
+
+ATE_ipw_glm=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+
+ATE_sipw_glm=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+
+df_glm%>%head()
+```
+
+```{r}
+# a-1. propensity score estimation-logistic regression by package
+log_reg_ps2=ps_glm(poisox~ age+sex, data=df)
+e_hat2=estimate_ps(log_reg_ps2)
+e_hat2 %>% head()
+
+print(sum(e_hat!=e_hat2))
+#직접 계산한것과 package로 한것의 차이가 없다는 것을 찾았습니다! 
+
+```
+
+```{r}
+# b.  propensity score estimation- Random Forest
+#install.packages("randomForest")
+library(randomForest)
+rf=randomForest(poisox~ age+sex, data=df0) ## factor 형태의 변수를 사용, classification
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+df_rf=df0
+
+for (i in 1:nrow(df_rf) ){
+  if (df_rf$poisox[i]==1){
+    df_rf[i,"ps"]=rf_ps[i]
+  } #df_rf의 i번째 행, ps 열의 값이 rf_ps[i]로 지정된다.
+  else{
+    df_rf[i,"ps"]=rf_ps[i]
+  }
+}
+df_rf %>% head() #데이터셋에 ps 열을 추가한 data
+
+#Random Forest- weighting
+
+zi=df_rf$poisox
+yi=df_rf$mortal
+e=df_rf$ps
+
+df_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_rf %>% head()
+
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+
+df_rf%>%head()
+
+```
+
+# b.  propensity score estimation- Random Forest by package
+
+
+```{r}
+#c. propensity score estimation- CART
+#install.packages("rpart")
+library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
+# summary(cart)
+# 
+# df0_c=df0
+# cart_ps=predict(cart)
+# df0_c["propensity score"]=cart_ps
+# df0_c %>% head()
+# 
+# df1_c=df1
+
+df_cart=df1
+cart=rpart(poisox~ age+sex, data=df_cart ,method='class')
+summary(cart)
+
+cart_ps=predict(cart)
+cart_ps %>% head()
+df_cart %>% head()
+for (i in 1:nrow(df_cart) ){
+  if (df_cart$poisox[i]=="1"){
+    df_cart[i,"ps"]=cart_ps[i,"1"]
+    df_cart[i,"trt"]=1}
+  else{
+    df_cart[i,"ps2"]=cart_ps[i,"0"]
+    df_cart[i,"trt"]=0
+  }
+}
+df_cart %>% head()
+```
+
+
+```{r}
+#c. propensity score estimation- CART by package
+
+cart2=ps_cart(poisox ~ age + sex, data = df1)
+cart_ps2=estimate_ps(cart2) 
+df1["propensity score"]=cart_ps2
+df1 %>% head()
+
+```
+```{r}
+# d. Add ipw_weight & calculate ATE_ipw
+df_cart %>% head()
+# for (i in 1:nrow(df1) ){
+#   if (df1$poisox[i]=="1"){
+#     df1[i,"propensity score2"]=cart_ps2[i,"0"]}
+#   else{df1[i,"propensity score2"]=cart_ps2[i,"1"]}
+# }
+zi=df_cart$trt
+yi=df_cart$mortal
+e=df_cart$`propensity score`
+
+
+df_cart["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_cart %>% head()
+
+```
+
+```{r}
+# d. calculate ATE_ipw and ATE_sipw
+
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+```
+
+```{r}
+#e. ATE_ipw and ATE_sipw of 'GLM, RF, CART'
+method_123 <- c('glm', 'rf', 'cart')
+
+ipw_sipw_method <- data.frame(method_123)
+ipw_sipw_method$ATE_ipw <- c(ATE_ipw_glm, ATE_ipw_rf, ATE_ipw_cart)
+ipw_sipw_method$ATE_sipw <- c(ATE_sipw_glm, ATE_sipw_rf, ATE_sipw_cart)
+
+ipw_sipw_method
+```
+
+
+# 2. Korea National Health and Nutrition Examination Survey Dataset
+## 2-1. Data reading
+```{r}
+raw_data <- read.sas7bdat("./HN20_ALL.sas7bdat")
+dim(raw_data) %>% head()
+#raw_data %>% head(1)
+
+```
+
+# 2-2. Data preprocessing
+```{r}
+column=c('BD1','DC2_dg','sex','age','DK8_dg','DK9_dg','DK4_dg')
+column2=c('BD1','DC2_dg','DK8_dg','DK9_dg','DK4_dg')
+
+
+df=raw_data[,column]
+df %>% head(7)
+
+df <- df[!(df$BD1 == 8 | df$BD1 ==9 | is.na(df$BD1)), ]
+df <- df[!(df$DC2_dg == 8 | df$DC2_dg ==9 ), ]
+df <- df[!(df$DK8_dg == 8 | df$DK8_dg ==9 ), ]
+df <- df[!(df$DK9_dg == 8 | df$DK9_dg ==9 ), ]
+df <- df[!(df$DK4_dg == 8 | df$DK4_dg ==9 ), ]
+
+df %>% head(7)
+```
+
+
+```{r}
+df$BD1<-df$BD1-1
+df$sex<-df$sex-1
+
+table(df$DC2_dg)
+table(df$BD1)
+sum(is.na(df$BD1))
+sum(is.na(df$DC2_dg))
+dim(df)
+which(df$BD1==0) %>% head()
+```
+
+## ATE estimation - glm, random forest, cart
+
+```{r}
+#logsitic regression
+df_lo=df
+
+log_reg_ps=glm(BD1~ .-DC2_dg, family = "binomial", data=df)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+lo_ps=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(lo_ps %>% head())
+
+
+for (i in 1:nrow(df_lo) ){
+  if (df_lo$BD1[i]==1){
+    df_lo[i,"ps"]=lo_ps[i]
+  }
+  else{
+    df_lo[i,"ps"]=lo_ps[i]
+  }
+}
+df_lo %>% head()
+
+#logistic regression - weighting
+
+zi=df_lo$BD1
+yi=df_lo$DC2_dg
+e=df_lo$ps
+
+df_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_lo %>% head()
+
+ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log
+
+ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log
+
+
+```
+
+```{r}
+# random forest - propensity score estimation
+df_rf=df
+
+rf=randomForest(BD1~ .-DC2_dg, data=df)
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+
+for (i in 1:nrow(df_rf) ){
+  if (df_rf$BD1[i]==1){
+    df_rf[i,"ps"]=rf_ps[i]
+  }
+  else{
+    df_rf[i,"ps"]=rf_ps[i]
+  }
+}
+df_rf %>% head()
+
+#Random Forest- weighting
+
+zi=df_rf$BD1
+yi=df_rf$DC2_dg
+e=df_rf$ps
+
+df_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_rf %>% head()
+
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf
+```
+
+```{r}
+#propensity score estimation- CART
+#install.packages("rpart")
+#library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
+# summary(cart)
+# 
+# df0_c=df0
+# cart_ps=predict(cart)
+# df0_c["propensity score"]=cart_ps
+# df0_c %>% head()
+# 
+# df1_c=df1
+
+df_c=df
+df_c["BD1_f"]=as.factor(df_c$BD1)
+
+cart2=rpart(BD1~ .-DC2_dg-BD1_f, data=df_c ,method='class')
+summary(cart2)
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df_c %>% head()
+df_c$BD1[95:100]
+
+#add propensity score
+for (i in 1:nrow(df_c) ){
+  
+  if (df_c$BD1[i]==1){
+    df_c[i,"ps"]=cart_ps2[i,"1"]
+  }
+  else{
+    df_c[i,"ps"]=cart_ps2[i,"0"]
+  }
+}
+
+#df_c[65:70,]
+```
+
+
+
+
+
+
+```{r}
+#add weighting- CART
+zi=df_c$BD1
+yi=df_c$DC2_dg
+e=df_c$ps
+
+df_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_c %>% head()
+
+#ATE_ipw
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+
+#ATE_sipw
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+# ATE_hat is very small..
+```
+```{r}
+rbind(ATE_ipw_log,ATE_sipw_log,ATE_ipw_rf,ATE_sipw_rf,ATE_ipw_cart, ATE_sipw_cart)
+```
+
+```
+
+### LaLonde dataset
+```{r}
+#
+# haven::read_data("http://www.nber.org/~rdehejia/data/nsw_dw.dta")
+#
+# lalonde::nsw_dw
+#
+# data(LaLonde)
+#
+# print(data)
+#
+# y <- LaLonde$outcome
+#
+# trt <- LaLonde$treat
+#
+# x.varnames <- c("age", "educ", "black", "hisp", "white",
+#                 "marr", "nodegr", "log.re75", "u75")
+#
+# # covariates
+# data.x <- LaLonde[, x.varnames]
+#
+#
+#
+# # construct design matrix (with no intercept)
+# x <- model.matrix(~ -1 + ., data = data.x)
+#
+# const.propens <- function(x, trt)
+# {
+#     mean.trt <- mean(trt == "Trt")
+#     rep(mean.trt, length(trt))
+# }
+#
+# subgrp_fit_w <- fit.subgroup(x = x, y = y, trt = trt,
+#     loss = "logistic_loss_lasso",
+#     propensity.func = const.propens,
+#     cutpoint = 0,
+#     type.measure = "auc",
+#     nfolds = 10)
+#
+# summary(subgrp_fit_w)
+```
