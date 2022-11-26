@@ -1,0 +1,3 @@
+chemical data를 yi = mortal 과 yi = blood_diff 로 해서 glm, rf, cart로 돌려보기
+evaluate 코드로 해당 3가지 방법들 비교해보기 (plot, table 형태로 분석해보자)
+발표자료 만들기 : 논문 내용을 기반으로 ml 기법이 기존 regression 방법에 비해 향상되었는지... 만약 현저한 차이가 없다면 pruned 방법을 사용??? .... 고민해보기
