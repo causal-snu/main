@@ -21,17 +21,22 @@
 - [propensity score github](https://github.com/ygeunkim/propensityml)
 --------------------------
 ## Propensity score analysis 요약
-  - propensity score를 활용하는 방식에 따라 분류.
+   - propensity score를 활용하는 방식에 따라 분류.
 1. propensity score weighting
-  - treatment group과 control group의 propensity score가 같아지도록 weight를 부여.
-  - Inverse probability of treatment weighting, IPW.
+   - treatment group과 control group의 propensity score가 같아지도록 weight를 부여.
+   - Inverse probability of treatment weighting, IPW.
 
 2. propensity score matching
-  - treatment group의 unit과 비슷한 propensity score를 가진 control group unit을 매칭.
+   - treatment group의 unit과 비슷한 propensity score를 가진 control group unit을 매칭.
   
 3. propensity score subclassification
-  - treatment group과 control group의 unit들을 propensity score가 비슷한 k개의 집단으로 subclassification.
+   - treatment group과 control group의 unit들을 propensity score가 비슷한 k개의 집단으로 subclassification.
 ----------------------------
+## 논문 레퍼런스 추가하는 방법
+1. 논문 사이트에 들어가 download citation-BibTex 복사하기.
+2. overleaf에 reference.bib 파일에 복사 붙여넣기.
+3. main.tex에 쓸 때는 논문 관련 단어\cite{논문 이름} 으로 추가하기.
+--------------------
 ## 스터디 일정
 - 2022-10-31-월-4시반
   - 앞으로 뭘 해야하는지 확인하고 과정 정리
