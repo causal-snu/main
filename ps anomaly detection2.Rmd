@@ -354,7 +354,14 @@ ATE_sipw_cart
 # ATE_hat is very small..
 ```
 ```{r}
-rbind(ATE_ipw_log,ATE_sipw_log,ATE_ipw_rf,ATE_sipw_rf,ATE_ipw_cart, ATE_sipw_cart)
+ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+ATE_table
 ```
 
 ```

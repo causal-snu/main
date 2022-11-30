@@ -462,7 +462,7 @@ library(randomForest)</code></pre>
 <pre class="r"><code>rf_ps=predict(rf)
 print(rf_ps %&gt;% head())</code></pre>
 <pre><code>##         1         2         3         4         5         6 
-## 0.6342726 0.8399273 0.7948522 0.6467732 0.8397936 0.8366522</code></pre>
+## 0.6289988 0.8382017 0.7897870 0.6357296 0.8425917 0.8400861</code></pre>
 <pre class="r"><code>df_rf=df0
 
 for (i in 1:nrow(df_rf) ){
@@ -475,12 +475,12 @@ for (i in 1:nrow(df_rf) ){
 }
 df_rf %&gt;% head()</code></pre>
 <pre><code>##   age sex poisox mortal        ps
-## 1  31   0      1      0 0.6342726
-## 2  35   1      1      1 0.8399273
-## 3  27   1      0      0 0.7948522
-## 4  66   0      0      1 0.6467732
-## 5  54   1      1      0 0.8397936
-## 6  35   1      1      0 0.8366522</code></pre>
+## 1  31   0      1      0 0.6289988
+## 2  35   1      1      1 0.8382017
+## 3  27   1      0      0 0.7897870
+## 4  66   0      0      1 0.6357296
+## 5  54   1      1      0 0.8425917
+## 6  35   1      1      0 0.8400861</code></pre>
 <pre class="r"><code>#Random Forest- weighting
 
 zi=df_rf$poisox
@@ -490,18 +490,18 @@ e=df_rf$ps
 df_rf[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
 df_rf %&gt;% head()</code></pre>
 <pre><code>##   age sex poisox mortal        ps    ipw_wt
-## 1  31   0      1      0 0.6342726  1.576609
-## 2  35   1      1      1 0.8399273  1.190579
-## 3  27   1      0      0 0.7948522 -4.874535
-## 4  66   0      0      1 0.6467732 -2.831042
-## 5  54   1      1      0 0.8397936  1.190769
-## 6  35   1      1      0 0.8366522  1.195240</code></pre>
+## 1  31   0      1      0 0.6289988  1.589828
+## 2  35   1      1      1 0.8382017  1.193030
+## 3  27   1      0      0 0.7897870 -4.757079
+## 4  66   0      0      1 0.6357296 -2.745213
+## 5  54   1      1      0 0.8425917  1.186814
+## 6  35   1      1      0 0.8400861  1.190354</code></pre>
 <pre class="r"><code>ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw</code></pre>
-<pre><code>## [1] 0.04212289</code></pre>
+<pre><code>## [1] 0.04319942</code></pre>
 <pre class="r"><code>ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw</code></pre>
-<pre><code>## [1] 0.0383831</code></pre>
+<pre><code>## [1] 0.03844086</code></pre>
 <pre class="r"><code># b.  propensity score estimation- Random Forest by package</code></pre>
 <pre class="r"><code>#c. propensity score estimation- CART
 #install.packages(&quot;rpart&quot;)
@@ -783,7 +783,7 @@ rf=randomForest(BD1~ .-DC2_dg, data=df)</code></pre>
 <pre class="r"><code>rf_ps=predict(rf)
 print(rf_ps %&gt;% head())</code></pre>
 <pre><code>##         1         2         7         8         9        10 
-## 0.9474360 0.9013992 0.8799678 0.9428430 0.8890257 0.9432840</code></pre>
+## 0.9510234 0.9035846 0.8880710 0.9447055 0.8965341 0.9481529</code></pre>
 <pre class="r"><code>for (i in 1:nrow(df_rf) ){
   if (df_rf$BD1[i]==1){
     df_rf[i,&quot;ps&quot;]=rf_ps[i]
@@ -794,12 +794,12 @@ print(rf_ps %&gt;% head())</code></pre>
 }
 df_rf %&gt;% head()</code></pre>
 <pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg        ps
-## 1    1      0   0  39      0      0      0 0.9474360
-## 2    1      0   1  39      0      0      0 0.9013992
-## 7    1      0   1  58      0      0      0 0.8799678
-## 8    1      0   0  56      0      0      0 0.9428430
-## 9    1      0   1  53      0      0      0 0.8890257
-## 10   1      0   0  20      0      0      0 0.9432840</code></pre>
+## 1    1      0   0  39      0      0      0 0.9510234
+## 2    1      0   1  39      0      0      0 0.9035846
+## 7    1      0   1  58      0      0      0 0.8880710
+## 8    1      0   0  56      0      0      0 0.9447055
+## 9    1      0   1  53      0      0      0 0.8965341
+## 10   1      0   0  20      0      0      0 0.9481529</code></pre>
 <pre class="r"><code>#Random Forest- weighting
 
 zi=df_rf$BD1
@@ -809,18 +809,18 @@ e=df_rf$ps
 df_rf[&quot;ipw_wt&quot;]= zi/e-(1-zi)/(1-e)
 df_rf %&gt;% head()</code></pre>
 <pre><code>##    BD1 DC2_dg sex age DK8_dg DK9_dg DK4_dg        ps   ipw_wt
-## 1    1      0   0  39      0      0      0 0.9474360 1.055480
-## 2    1      0   1  39      0      0      0 0.9013992 1.109386
-## 7    1      0   1  58      0      0      0 0.8799678 1.136405
-## 8    1      0   0  56      0      0      0 0.9428430 1.060622
-## 9    1      0   1  53      0      0      0 0.8890257 1.124827
-## 10   1      0   0  20      0      0      0 0.9432840 1.060126</code></pre>
+## 1    1      0   0  39      0      0      0 0.9510234 1.051499
+## 2    1      0   1  39      0      0      0 0.9035846 1.106703
+## 7    1      0   1  58      0      0      0 0.8880710 1.126036
+## 8    1      0   0  56      0      0      0 0.9447055 1.058531
+## 9    1      0   1  53      0      0      0 0.8965341 1.115406
+## 10   1      0   0  20      0      0      0 0.9481529 1.054682</code></pre>
 <pre class="r"><code>ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw_rf</code></pre>
-<pre><code>## [1] 0.001262613</code></pre>
+<pre><code>## [1] 0.00125664</code></pre>
 <pre class="r"><code>ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw_rf</code></pre>
-<pre><code>## [1] 0.001269103</code></pre>
+<pre><code>## [1] 0.001263385</code></pre>
 <pre class="r"><code>#propensity score estimation- CART
 #install.packages(&quot;rpart&quot;)
 #library(rpart)
@@ -905,12 +905,19 @@ ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw_cart</code></pre>
 <pre><code>## [1] 0.001246106</code></pre>
 <pre class="r"><code># ATE_hat is very small..</code></pre>
-<pre class="r"><code>rbind(ATE_ipw_log,ATE_sipw_log,ATE_ipw_rf,ATE_sipw_rf,ATE_ipw_cart, ATE_sipw_cart)</code></pre>
+<pre class="r"><code>ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+ATE_table</code></pre>
 <pre><code>##                      [,1]
 ## ATE_ipw_log   0.001258102
 ## ATE_sipw_log  0.001260146
-## ATE_ipw_rf    0.001262613
-## ATE_sipw_rf   0.001269103
+## ATE_ipw_rf    0.001256640
+## ATE_sipw_rf   0.001263385
 ## ATE_ipw_cart  0.001246106
 ## ATE_sipw_cart 0.001246106</code></pre>
 <pre><code>
