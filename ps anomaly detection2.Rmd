@@ -184,34 +184,41 @@ dim(raw_data) %>% head()
 
 # 2-2. Data preprocessing
 ```{r}
-column=c('BD1','DC2_dg','sex','age','DK8_dg','DK9_dg','DK4_dg')
+column=c('BD1','DC2_dg','sex','age','DK8_dg','DK9_dg','DK4_dg','DE1_dg','DI1_dg')
 column2=c('BD1','DC2_dg','DK8_dg','DK9_dg','DK4_dg')
-
 
 df=raw_data[,column]
 df %>% head(7)
 
-df <- df[!(df$BD1 == 8 | df$BD1 ==9 | is.na(df$BD1)), ]
-df <- df[!(df$DC2_dg == 8 | df$DC2_dg ==9 ), ]
-df <- df[!(df$DK8_dg == 8 | df$DK8_dg ==9 ), ]
-df <- df[!(df$DK9_dg == 8 | df$DK9_dg ==9 ), ]
-df <- df[!(df$DK4_dg == 8 | df$DK4_dg ==9 ), ]
+ncol(df)
+for(i in 1:ncol(df)){
+  df<- df[!(df[,i] == 8 |df[,i] == 9 | is.na(df[,i])), ]
+}
+df1=df2=df
+df2
+df1
+colnames(df)[1]="treat"
+colnames(df)[9]="outcome"
 
 df %>% head(7)
 ```
 
 
 ```{r}
-df$BD1<-df$BD1-1
+df$treat<-df$treat-1
 df$sex<-df$sex-1
 
-table(df$DC2_dg)
-table(df$BD1)
-sum(is.na(df$BD1))
-sum(is.na(df$DC2_dg))
-dim(df)
-which(df$BD1==0) %>% head()
-```
+length(df$DK8_dg)
+print(df$DK8_dg)
+length(df$BD1)
+
+# table(df$treat,df$outcome)
+# (df$DC8_dg==0)
+# sum(is.na(df$treat))
+# sum(is.na(df$outcome))
+# dim(df)
+# which(df$treat==0) %>% head()
+ ```
 
 ## ATE estimation - glm, random forest, cart
 
@@ -219,7 +226,7 @@ which(df$BD1==0) %>% head()
 #logsitic regression
 df_lo=df
 
-log_reg_ps=glm(BD1~ .-DC2_dg, family = "binomial", data=df)
+log_reg_ps=glm(treat~ .-outcome, family = "binomial", data=df)
 logit_e_hat=predict(log_reg_ps)
 print(logit_e_hat %>% head())
 
@@ -228,7 +235,7 @@ print(lo_ps %>% head())
 
 
 for (i in 1:nrow(df_lo) ){
-  if (df_lo$BD1[i]==1){
+  if (df_lo$treat[i]==1){
     df_lo[i,"ps"]=lo_ps[i]
   }
   else{
@@ -239,19 +246,36 @@ df_lo %>% head()
 
 #logistic regression - weighting
 
-zi=df_lo$BD1
-yi=df_lo$DC2_dg
+zi=df_lo$treat
+yi=df_lo$outcome
 e=df_lo$ps
 
 df_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
 df_lo %>% head()
 
+#ATE estimation
 ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw_log
 
 ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw_log
 
+#Evaluate
+cov_balance_lo=data.frame(rep(0),row.names = "logistic regression")
+
+for(i in colnames(df)){
+  if(i!="treat" & i!="outcome"){
+    print(df[i])
+    t_weighted_mean=mean((df[i]*df_lo$ipw_wt)[df$treat==1,])
+    c_weighted_mean=mean((df[i]*df_lo$ipw_wt)[df$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df[i]*df_lo$ipw_wt)[df$treat==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo$total=apply(cov_balance_lo,1,mean)
+cov_balance_lo["total"]
 
 ```
 
@@ -259,13 +283,13 @@ ATE_sipw_log
 # random forest - propensity score estimation
 df_rf=df
 
-rf=randomForest(BD1~ .-DC2_dg, data=df)
+rf=randomForest(treat~ .-outcome, data=df)
 rf_ps=predict(rf)
 print(rf_ps %>% head())
 
 
 for (i in 1:nrow(df_rf) ){
-  if (df_rf$BD1[i]==1){
+  if (df_rf$treat[i]==1){
     df_rf[i,"ps"]=rf_ps[i]
   }
   else{
@@ -276,18 +300,36 @@ df_rf %>% head()
 
 #Random Forest- weighting
 
-zi=df_rf$BD1
-yi=df_rf$DC2_dg
+zi=df_rf$treat
+yi=df_rf$outcome
 e=df_rf$ps
 
 df_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
 df_rf %>% head()
 
+#ATE estimation
 ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw_rf
 
 ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw_rf
+
+#Evaluate
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+for(i in colnames(df)){
+  if(i!="treat" & i!="outcome"){
+    print(df[i])
+    t_weighted_mean=mean((df[i]*df_rf$ipw_wt)[df$treat==1,])
+    c_weighted_mean=mean((df[i]*df_rf$ipw_wt)[df$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df[i]*df_rf$ipw_wt)[df$treat==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf$total=apply(cov_balance_rf,1,mean)
+cov_balance_rf["total"]
 ```
 
 ```{r}
@@ -306,20 +348,20 @@ ATE_sipw_rf
 # df1_c=df1
 
 df_c=df
-df_c["BD1_f"]=as.factor(df_c$BD1)
+df_c["treat_f"]=as.factor(df_c$treat)
 
-cart2=rpart(BD1~ .-DC2_dg-BD1_f, data=df_c ,method='class')
+cart2=rpart(treat~ .-outcome-treat_f, data=df_c ,method='class')
 summary(cart2)
 
 cart_ps2=predict(cart2)
 cart_ps2 %>% head()
 df_c %>% head()
-df_c$BD1[95:100]
+df_c$treat[95:100]
 
 #add propensity score
 for (i in 1:nrow(df_c) ){
 
-  if (df_c$BD1[i]==1){
+  if (df_c$treat[i]==1){
     df_c[i,"ps"]=cart_ps2[i,"1"]
   }
   else{
@@ -337,8 +379,8 @@ for (i in 1:nrow(df_c) ){
 
 ```{r}
 #add weighting- CART
-zi=df_c$BD1
-yi=df_c$DC2_dg
+zi=df_c$treat
+yi=df_c$outcome
 e=df_c$ps
 
 df_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
@@ -351,7 +393,23 @@ ATE_ipw_cart
 #ATE_sipw
 ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw_cart
-# ATE_hat is very small..
+
+#Evaluate
+cov_balance_cart=data.frame(rep(0),row.names = "CART")
+
+for(i in colnames(df)){
+  if(i!="treat" & i!="outcome"){
+    print(df[i])
+    t_weighted_mean=mean((df[i]*df_c$ipw_wt)[df$treat==1,])
+    c_weighted_mean=mean((df[i]*df_c$ipw_wt)[df$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df[i]*df_c$ipw_wt)[df$treat==1,])
+    cov_balance_cart[i]=asam
+  }
+}
+cov_balance_cart=cov_balance_cart[,-1]
+cov_balance_cart$total=apply(cov_balance_cart,1,mean)
+cov_balance_cart["total"]
 ```
 ```{r}
 ATE_table= rbind(ATE_ipw_log,
@@ -365,6 +423,12 @@ ATE_table
 ```
 
 ```
+#Evaluate
+```{r}
+ASAM_table=rbind(cov_balance_lo["total"] ,cov_balance_rf["total"] ,cov_balance_cart["total"])
+ASAM_table
+```
+
 
 ### LaLonde dataset
 ```{r}
