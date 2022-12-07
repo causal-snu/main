@@ -52,7 +52,51 @@ e_hat2 %>% head()
 
 print(sum(e_hat!=e_hat2))
 
+df_lo=df0
+
+for (i in 1:nrow(df_lo) ){
+  df_lo[i,"ps"]=e_hat2[i]
+}
+
+df_lo %>% head()
+
+# weighting
+
+zi=df_lo$poisox
+yi=df_lo$mortal
+e=df_lo$ps
+
+df_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_lo %>% head()
+
+ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw
+
+ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw
+
 ```
+## Evaluate
+```{r}
+cov_balance_lo=data.frame(rep(0),row.names = "Logistic Regression")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df_lo$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df_lo$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df_lo$ipw_wt)[df0$poisox==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo
+cov_balance_lo$Average_ASAM=apply(cov_balance_lo,1,mean)
+cov_balance_lo["Average_ASAM"]
+```
+
 
 ```{r}
 # b.  propensity score estimation- Random Forest
@@ -65,15 +109,14 @@ print(rf_ps %>% head())
 df_rf=df0
 
 for (i in 1:nrow(df_rf) ){
-  if (df_rf$poisox[i]==1){
-    df_rf[i,"ps"]=rf_ps[i]
-  }
-  else{
-    df_rf[i,"ps"]=rf_ps[i]
-  }
+  df_rf[i,"ps"]=rf_ps[i]
 }
 df_rf %>% head()
 
+```
+
+
+```{r}
 #Random Forest- weighting
 
 zi=df_rf$poisox
@@ -90,10 +133,28 @@ ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw
 
 
-
-
-
 ```
+## Evaluate
+```{r}
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df_rf$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df_rf$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df_rf$ipw_wt)[df0$poisox==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf
+cov_balance_rf$Average_ASAM=apply(cov_balance_rf,1,mean)
+cov_balance_rf["Average_ASAM"]
+```
+
 
 ```{r}
 # b.  propensity score estimation- Random Forest by package
@@ -163,6 +224,8 @@ ATE_ipw=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw
 ```
 
+
+
 ```{r}
 # d. calculate ATE_sipw
 
@@ -170,6 +233,49 @@ ATE_sipw=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw
 
 ```
+## Evaluate
+```{r}
+cov_balance_c=data.frame(rep(0),row.names = "CART")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df1_c$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df1_c$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df1_c$ipw_wt)[df0$poisox==1,])
+    cov_balance_c[i]=asam
+  }
+}
+cov_balance_c=cov_balance_c[,-1]
+cov_balance_c
+cov_balance_c$Average_ASAM=apply(cov_balance_c,1,mean)
+cov_balance_c["Average_ASAM"]
+```
+## Evaluation visualization - Chemical dataset
+```{r}
+ASAM_table=rbind(cov_balance_lo["Average_ASAM"] ,cov_balance_rf["Average_ASAM"] ,cov_balance_c["Average_ASAM"])
+knitr::kable(ASAM_table,"simple")
+
+a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_c))
+colnames(a)=c("LR","RF","CART")
+boxplot(a, main="ASAM in the Chemical Dataset",horizontal = TRUE)
+
+
+b=cbind(df_lo["ps"],df_rf["ps"],df1_c["ps2"])
+colnames(b)=c("LR","RF","CART")
+boxplot(b,horizontal = TRUE,main="Propensity score distribution in the Chemical Dataset")
+
+par(mfcol=c(1,3))
+boxplot(df_lo[(df0$poisox==0),"ipw_wt"],main="LR")
+boxplot(df_rf[(df0$poisox==0),"ipw_wt"],main="RF")
+boxplot(df1_c[(df0$poisox==0),"ipw_wt"],main="CART")
+mtext("Weight distribution in the Chemical Dataset")
+
+```
+
+
 
 
 # 2. Korea National Health and Nutrition Examination Survey Dataset
@@ -347,6 +453,7 @@ for(i in colnames(df1)){
   }
 }
 cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf
 cov_balance_rf$Average_ASAM=apply(cov_balance_rf,1,mean)
 cov_balance_rf["Average_ASAM"]
 ```
@@ -444,11 +551,19 @@ ATE_table= rbind(ATE_ipw_log,
 ATE_table
 ```
 
+```{r, results='asis'}
+
+#install.packages("knitr")
+
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+knitr::kable(ATE_table,"simple")
+```
+
 
 ## Evaluation visualization
 ```{r}
 ASAM_table=rbind(cov_balance_lo["Average_ASAM"] ,cov_balance_rf["Average_ASAM"] ,cov_balance_cart["Average_ASAM"])
-ASAM_table
+knitr::kable(ASAM_table,"simple")
 
 a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_cart))
 colnames(a)=c("LR","RF","CART")
@@ -459,10 +574,12 @@ b=cbind(df1_lo["ps"],df1_rf["ps"],df1_c["ps"])
 colnames(b)=c("LR","RF","CART")
 boxplot(b,horizontal = TRUE,main="Propensity score distribution by propensity score estimation model")
 
+?par
 par(mfcol=c(1,3))
-boxplot(df1_lo["ipw_wt"])
-boxplot(df1_rf["ipw_wt"])
-boxplot(df1_c["ipw_wt"])
+title="Weight distribution for untreated observation by propensity score estimation model"
+boxplot(df1_lo[(df1_lo$treat==0),"ipw_wt"],main="LR")
+boxplot(df1_rf[(df1_lo$treat==0),"ipw_wt"],main="RF")
+boxplot(df1_c[(df1_lo$treat==0),"ipw_wt"],main="CART")
 ```
 
 ## High blood pressure & Drinking

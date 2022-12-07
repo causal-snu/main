@@ -1,0 +1,871 @@
+---
+title: "Causal_project"
+output: html_document
+date: '2022-11-15'
+---
+## Install packages & library
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+# 1. Chemical Dataset
+## 1-1. Data reading
+```{r}
+df<-read.table('/Users/kyungseonlee/Desktop/causal/poisox.txt')
+colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
+df%>% head()
+
+#df0 has integer values.
+df0=df[c(1,2,4,6)]
+df0 %>% head()
+
+#df1 has factor values.
+df1=df0
+df1[2:3]=lapply(df1[2:3],factor)
+df1 %>% head()
+```
+## 1-2. Propensity score estimation- logistic regression, random Forest, CART
+```{r}
+# a. propensity score estimation-logistic regression
+log_reg_ps=glm(poisox~ age+sex, family = "binomial", data=df)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+#exp(logit_e_hat)
+e_hat=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(e_hat %>% head())
+```
+
+```{r}
+# a-1. propensity score estimation-logistic regression by package
+
+log_reg_ps2=ps_glm(poisox~ age+sex, data=df)
+e_hat2=estimate_ps(log_reg_ps2)
+e_hat2 %>% head()
+
+print(sum(e_hat!=e_hat2))
+
+df_lo=df0
+
+for (i in 1:nrow(df_lo) ){
+  df_lo[i,"ps"]=e_hat2[i]
+}
+
+df_lo %>% head()
+
+# weighting
+
+zi=df_lo$poisox
+yi=df_lo$mortal
+e=df_lo$ps
+
+df_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_lo %>% head()
+
+ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log
+
+ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log
+
+```
+## Evaluate
+```{r}
+cov_balance_lo=data.frame(rep(0),row.names = "Logistic Regression")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df_lo$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df_lo$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df_lo$ipw_wt)[df0$poisox==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo
+cov_balance_lo$ASAM=apply(cov_balance_lo,1,mean)
+cov_balance_lo["ASAM"]
+```
+
+
+```{r}
+# b.  propensity score estimation- Random Forest
+#install.packages("randomForest")
+library(randomForest)
+rf=randomForest(poisox~ age+sex, data=df0)
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+df_rf=df0
+
+for (i in 1:nrow(df_rf) ){
+  df_rf[i,"ps"]=rf_ps[i]
+}
+df_rf %>% head()
+
+```
+
+
+```{r}
+#Random Forest- weighting
+
+zi=df_rf$poisox
+yi=df_rf$mortal
+e=df_rf$ps
+
+df_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df_rf %>% head()
+
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf
+
+
+```
+## Evaluate
+```{r}
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df_rf$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df_rf$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df_rf$ipw_wt)[df0$poisox==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf
+cov_balance_rf$ASAM=apply(cov_balance_rf,1,mean)
+cov_balance_rf["ASAM"]
+```
+
+
+```{r}
+# b.  propensity score estimation- Random Forest by package
+```
+
+```{r}
+#c. propensity score estimation- CART
+#install.packages("rpart")
+library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df0 ,method='poisson')
+# summary(cart)
+# 
+# df0_c=df0
+# cart_ps=predict(cart)
+# df0_c["propensity score"]=cart_ps
+# df0_c %>% head()
+# 
+# df1_c=df1
+
+df1_c=df1
+cart2=rpart(poisox~ age+sex, data=df1_c ,method='class')
+summary(cart2)
+
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df1_c %>% head()
+for (i in 1:nrow(df1) ){
+  if (df1$poisox[i]=="1"){
+    df1_c[i,"ps2"]=cart_ps2[i,"1"]
+    df1_c[i,"trt"]=1}
+  else{
+    df1_c[i,"ps2"]=cart_ps2[i,"0"]
+    df1_c[i,"trt"]=0
+  }
+}
+df1_c %>% head()
+
+```
+
+
+```{r}
+#c. propensity score estimation- CART by package
+
+cart2=ps_cart(poisox ~ age + sex, data = df1)
+cart_ps2=estimate_ps(cart2)
+df1["propensity score"]=cart_ps2
+df1 %>% head()
+
+```
+```{r}
+# d. Add ipw_weight & calculate ATE_ipw
+df1_c %>% head()
+# for (i in 1:nrow(df1) ){
+#   if (df1$poisox[i]=="1"){
+#     df1[i,"propensity score2"]=cart_ps2[i,"0"]}
+#   else{df1[i,"propensity score2"]=cart_ps2[i,"1"]}
+# }
+zi=df1_c$trt
+yi=df1_c$mortal
+e=df1_c$ps2
+
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
+
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+```
+
+
+
+```{r}
+# d. calculate ATE_sipw
+
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+
+```
+## Evaluate
+```{r}
+cov_balance_c=data.frame(rep(0),row.names = "CART")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df1_c$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df1_c$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df1_c$ipw_wt)[df0$poisox==1,])
+    cov_balance_c[i]=asam
+  }
+}
+cov_balance_c=cov_balance_c[,-1]
+cov_balance_c
+cov_balance_c$ASAM=apply(cov_balance_c,1,mean)
+cov_balance_c["ASAM"]
+```
+## Evaluation visualization - Chemical dataset
+```{r}
+ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+colnames(ATE_table)="ATE table in Chemical Dataset"
+knitr :: kable(ATE_table,"simple")
+
+ASAM_table1=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_c["ASAM"])
+colnames(ASAM_table1)="ASAM in Chemical Dataset"
+knitr::kable(ASAM_table1,"simple")
+
+a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_c))
+colnames(a)=c("LR","RF","CART")
+boxplot(a, main="ASAM in the Chemical Dataset",horizontal = TRUE)
+
+
+b=cbind(df_lo["ps"],df_rf["ps"],df1_c["ps2"])
+colnames(b)=c("LR","RF","CART")
+boxplot(b,horizontal = TRUE,main="Propensity score distribution in the Chemical Dataset")
+
+par(mfcol=c(1,3))
+boxplot(df_lo[(df0$poisox==0),"ipw_wt"],main="LR in Chemical")
+boxplot(df_rf[(df0$poisox==0),"ipw_wt"],main="RF in Chemical")
+boxplot(df1_c[(df0$poisox==0),"ipw_wt"],main="CART in Chemical")
+
+```
+
+
+
+
+# 2. Korea National Health and Nutrition Examination Survey Dataset
+## 2-1. Data reading
+```{r}
+
+raw_data <- read.sas7bdat("/Users/kyungseonlee/snu-causal/main/input/rawdata/HN20_ALL.sas7bdat")
+dim(raw_data) %>% head()
+#raw_data %>% head(1)
+
+```
+
+# 2-2. Data preprocessing
+```{r}
+column=c('BD1','sex','age','BD1_11','BD2_1','DE1_dg','DI1_dg')
+column2=c('BD1','DC2_dg','DK8_dg','DK9_dg','DK4_dg')
+
+df=raw_data[,column]
+df %>% head(7)
+
+for(i in 1:ncol(df)){
+  if(i==4|i==5){
+    df<- df[!(df[,i] == 9 | is.na(df[,i])), ]
+    df[(df[,i]==8),i]=0
+  }else{
+    df<- df[!(df[,i] == 8 |df[,i] == 9 | is.na(df[,i])), ]
+  }
+  
+}
+df %>% head(20)
+sum(is.na(df))
+
+# First topic: Diabetes causal inference
+df1=df[,-7]
+colnames(df1)[1]="treat"
+colnames(df1)[6]="outcome"
+
+# Second topic: High blood pressure causal inference
+df2=df[,-6]
+colnames(df2)[1]="treat"
+colnames(df2)[6]="outcome"
+
+df1 %>% head(7)
+df2 %>% head(7)
+```
+## Diabetes & Drinking
+
+```{r}
+df1$treat<-df1$treat-1
+df1$sex<-df1$sex-1
+
+df1 %>% head(7)
+
+table(df1$treat,df1$outcome)
+
+# (df1$DC8_dg==0)
+# sum(is.na(df1$treat))
+# sum(is.na(df1$outcome))
+# dim(df1)
+# which(df1$treat==0) %>% head()
+```
+
+## ATE estimation - glm, random forest, cart
+
+```{r}
+#logsitic regression
+df1_lo=df1
+df1_lo %>% head(10)
+
+log_reg_ps=glm(treat~ sex+age, family = "binomial", data=df1)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+lo_ps=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(lo_ps %>% head())
+
+
+for (i in 1:nrow(df1_lo) ){
+  if (df1_lo$treat[i]==1){
+    df1_lo[i,"ps"]=lo_ps[i]
+  }
+  else{
+    df1_lo[i,"ps"]=lo_ps[i]
+  }
+}
+df1_lo %>% head()
+
+#logistic regression - weighting
+
+zi=df1_lo$treat
+yi=df1_lo$outcome
+e=df1_lo$ps
+
+df1_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_lo %>% head()
+
+#ATE estimation
+ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log
+
+ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log
+
+```
+## Evaluate
+
+```{r}
+cov_balance_lo=data.frame(rep(0),row.names = "logistic regression")
+
+for(i in colnames(df1)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df1[i]*df1_lo$ipw_wt)[df1$treat==1,])
+    c_weighted_mean=mean((df1[i]*df1_lo$ipw_wt)[df1$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df1[i]*df1_lo$ipw_wt)[df1$treat==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo$ASAM=apply(cov_balance_lo,1,mean)
+cov_balance_lo["ASAM"]
+
+```
+
+```{r}
+# random forest - propensity score estimation
+df1_rf=df1
+
+rf=randomForest(treat~ age+sex, data=df1)
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+
+for (i in 1:nrow(df1_rf) ){
+  if (df1_rf$treat[i]==1){
+    df1_rf[i,"ps"]=rf_ps[i]
+  }
+  else{
+    df1_rf[i,"ps"]=rf_ps[i]
+  }
+}
+df1_rf %>% head()
+
+#Random Forest- weighting
+
+zi=df1_rf$treat
+yi=df1_rf$outcome
+e=df1_rf$ps
+
+df1_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_rf %>% head()
+
+#ATE estimation
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf
+```
+
+## Evaluate
+```{r}
+
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+for(i in colnames(df1)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df1[i]*df1_rf$ipw_wt)[df1$treat==1,])
+    c_weighted_mean=mean((df1[i]*df1_rf$ipw_wt)[df1$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df1[i]*df1_rf$ipw_wt)[df1$treat==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf
+cov_balance_rf$ASAM=apply(cov_balance_rf,1,mean)
+cov_balance_rf["ASAM"]
+```
+
+```{r}
+#propensity score estimation- CART
+#install.packages("rpart")
+#library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df10 ,method='poisson')
+# summary(cart)
+# 
+# df10_c=df10
+# cart_ps=predict(cart)
+# df10_c["propensity score"]=cart_ps
+# df10_c %>% head()
+# 
+# df11_c=df11
+
+df1_c=df1
+df1_c["treat_f"]=as.factor(df1_c$treat)
+
+cart2=rpart(treat_f~ age+sex, data=df1_c ,method='class')
+summary(cart2)
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df1_c %>% head()
+df1_c$treat[95:100]
+
+#add propensity score
+for (i in 1:nrow(df1_c) ){
+
+  if (df1_c$treat[i]==1){
+    df1_c[i,"ps"]=cart_ps2[i,"1"]
+  }
+  else{
+    df1_c[i,"ps"]=cart_ps2[i,"0"]
+  }
+}
+
+#df1_c[65:70,]
+```
+
+
+
+
+
+
+```{r}
+#add weighting- CART
+zi=df1_c$treat
+yi=df1_c$outcome
+e=df1_c$ps
+
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
+
+#ATE_ipw
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+
+#ATE_sipw
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+```
+
+## Evaluate
+```{r}
+
+cov_balance_cart=data.frame(rep(0),row.names = "CART")
+
+for(i in colnames(df1)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df1[i]*df1_c$ipw_wt)[df1$treat==1,])
+    c_weighted_mean=mean((df1[i]*df1_c$ipw_wt)[df1$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df1[i]*df1_c$ipw_wt)[df1$treat==1,])
+    cov_balance_cart[i]=asam
+  }
+}
+cov_balance_cart=cov_balance_cart[,-1]
+cov_balance_cart$ASAM=apply(cov_balance_cart,1,mean)
+cov_balance_cart["ASAM"]
+```
+```{r}
+ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+colnames(ATE_table)="ATE table in KHN Dataset"
+
+knitr :: kable(ATE_table,"simple")
+```
+
+```{r, results='asis'}
+
+#install.packages("knitr")
+
+```
+
+
+## Evaluation visualization
+```{r}
+ASAM_table2=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_cart["ASAM"])
+colnames(ASAM_table2)="ASAM in KHN Dataset"
+knitr::kable(ASAM_table2,"simple")
+
+a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_cart))
+colnames(a)=c("LR","RF","CART")
+boxplot(a, main="ASAM in the KHN Dataset",horizontal = TRUE)
+
+
+b=cbind(df1_lo["ps"],df1_rf["ps"],df1_c["ps"])
+colnames(b)=c("LR","RF","CART")
+boxplot(b,horizontal = TRUE,main="Propensity score distribution in the KHN Dataset")
+
+?par
+par(mfcol=c(1,3))
+boxplot(df1_lo[(df1_lo$treat==0),"ipw_wt"],main="LR in KHN")
+boxplot(df1_rf[(df1_lo$treat==0),"ipw_wt"],main="RF in KHN")
+boxplot(df1_c[(df1_lo$treat==0),"ipw_wt"],main="CART in KHN")
+```
+
+```{r}
+sim=data.frame(c(0.094,0.075,0.143))
+colnames(sim)="ASAM in simulated dataset"
+rownames(sim)=c("logistic regression","Random Forest","CART")
+knitr :: kable(sim,"simple")
+```
+
+
+## High blood pressure & Drinking
+
+```{r}
+df2$treat<-df2$treat-1
+df2$sex<-df2$sex-1
+
+table(df2$treat,df2$outcome)
+# (df2$DC8_dg==0)
+# sum(is.na(df2$treat))
+# sum(is.na(df2$outcome))
+# dim(df2)
+# which(df2$treat==0) %>% head()
+```
+
+## ATE estimation - glm, random forest, cart
+
+```{r}
+#logsitic regression
+df2_lo=df2
+
+log_reg_ps=glm(treat~ age+sex, family = "binomial", data=df2)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+lo_ps=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(lo_ps %>% head())
+
+
+for (i in 1:nrow(df2_lo) ){
+  if (df2_lo$treat[i]==1){
+    df2_lo[i,"ps"]=lo_ps[i]
+  }
+  else{
+    df2_lo[i,"ps"]=lo_ps[i]
+  }
+}
+df2_lo %>% head()
+
+#logistic regression - weighting
+
+zi=df2_lo$treat
+yi=df2_lo$outcome
+e=df2_lo$ps
+
+df2_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df2_lo %>% head()
+
+#ATE estimation
+ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log
+
+ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log
+
+#Evaluate
+cov_balance_lo=data.frame(rep(0),row.names = "logistic regression")
+
+for(i in colnames(df2)){
+  if(i!="treat" & i!="outcome"){
+#    print(df2[i])
+    t_weighted_mean=mean((df2[i]*df2_lo$ipw_wt)[df2$treat==1,])
+    c_weighted_mean=mean((df2[i]*df2_lo$ipw_wt)[df2$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df2[i]*df2_lo$ipw_wt)[df2$treat==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo$ASAM=apply(cov_balance_lo,1,mean)
+cov_balance_lo["ASAM"]
+
+```
+
+```{r}
+# random forest - propensity score estimation
+df2_rf=df2
+
+rf=randomForest(treat~ age+sex, data=df2)
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+
+for (i in 1:nrow(df2_rf) ){
+  if (df2_rf$treat[i]==1){
+    df2_rf[i,"ps"]=rf_ps[i]
+  }
+  else{
+    df2_rf[i,"ps"]=rf_ps[i]
+  }
+}
+df2_rf %>% head()
+
+#Random Forest- weighting
+
+zi=df2_rf$treat
+yi=df2_rf$outcome
+e=df2_rf$ps
+
+df2_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df2_rf %>% head()
+
+#ATE estimation
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf
+
+#Evaluate
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+for(i in colnames(df2)){
+  if(i!="treat" & i!="outcome"){
+#    print(df2[i])
+    t_weighted_mean=mean((df2[i]*df2_rf$ipw_wt)[df2$treat==1,])
+    c_weighted_mean=mean((df2[i]*df2_rf$ipw_wt)[df2$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df2[i]*df2_rf$ipw_wt)[df2$treat==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf$ASAM=apply(cov_balance_rf,1,mean)
+cov_balance_rf["ASAM"]
+
+```
+
+```{r}
+#propensity score estimation- CART
+#install.packages("rpart")
+#library(rpart)
+
+# cart=rpart(poisox~ age+sex, data=df20 ,method='poisson')
+# summary(cart)
+# 
+# df20_c=df20
+# cart_ps=predict(cart)
+# df20_c["propensity score"]=cart_ps
+# df20_c %>% head()
+# 
+# df21_c=df21
+
+df2_c=df2
+df2_c["treat_f"]=as.factor(df2_c$treat)
+
+cart2=rpart(treat_f~ age+sex, data=df2_c ,method='class')
+summary(cart2)
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df2_c %>% head()
+df2_c$treat[95:100]
+
+#add propensity score
+for (i in 1:nrow(df2_c) ){
+
+  if (df2_c$treat[i]==1){
+    df2_c[i,"ps"]=cart_ps2[i,"1"]
+  }
+  else{
+    df2_c[i,"ps"]=cart_ps2[i,"0"]
+  }
+}
+
+#df2_c[65:70,]
+```
+
+
+
+```{r}
+#add weighting- CART
+zi=df2_c$treat
+yi=df2_c$outcome
+e=df2_c$ps
+
+df2_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df2_c %>% head()
+
+#ATE_ipw
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+
+#ATE_sipw
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+
+#Evaluate
+cov_balance_cart=data.frame(rep(0),row.names = "CART")
+
+for(i in colnames(df2)){
+  if(i!="treat" & i!="outcome"){
+#    print(df2[i])
+    t_weighted_mean=mean((df2[i]*df2_c$ipw_wt)[df2$treat==1,])
+    c_weighted_mean=mean((df2[i]*df2_c$ipw_wt)[df2$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df2[i]*df2_c$ipw_wt)[df2$treat==1,])
+    cov_balance_cart[i]=asam
+  }
+}
+cov_balance_cart=cov_balance_cart[,-1]
+cov_balance_cart$ASAM=apply(cov_balance_cart,1,mean)
+cov_balance_cart["ASAM"]
+```
+
+```{r}
+ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+ATE_table
+```
+
+```
+#Evaluate
+```{r}
+ASAM_table2=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_cart["ASAM"])
+ASAM_table2
+
+a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_cart))
+boxplot(a, main="ASAM by propensity score estimation model")
+
+```
+
+### LaLonde dataset
+```{r}
+#
+# haven::read_data("http://www.nber.org/~rdehejia/data/nsw_dw.dta")
+#
+# lalonde::nsw_dw
+#
+# data(LaLonde)
+#
+# print(data)
+#
+# y <- LaLonde$outcome
+#
+# trt <- LaLonde$treat
+#
+# x.varnames <- c("age", "educ", "black", "hisp", "white",
+#                 "marr", "nodegr", "log.re75", "u75")
+#
+# # covariates
+# data.x <- LaLonde[, x.varnames]
+#
+#
+#
+# # construct design matrix (with no intercept)
+# x <- model.matrix(~ -1 + ., data = data.x)
+#
+# const.propens <- function(x, trt)
+# {
+#     mean.trt <- mean(trt == "Trt")
+#     rep(mean.trt, length(trt))
+# }
+#
+# subgrp_fit_w <- fit.subgroup(x = x, y = y, trt = trt,
+#     loss = "logistic_loss_lasso",
+#     propensity.func = const.propens,
+#     cutpoint = 0,
+#     type.measure = "auc",
+#     nfolds = 10)
+#
+# summary(subgrp_fit_w)
+```
+
