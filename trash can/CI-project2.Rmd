@@ -22,6 +22,12 @@ df<-read.table('/Users/kyungseonlee/Desktop/causal/poisox.txt')
 colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
 df%>% head()
 
+df3=df
+df3$blood_diff=df3$subseq-df3$prior
+df3=df3[c(1,2,4,6,7)]
+df3 %>% head()
+
+
 #df0 has integer values.
 df0=df[c(1,2,4,6)]
 df0 %>% head()
@@ -175,8 +181,40 @@ library(rpart)
 # 
 # df1_c=df1
 
-df1_c=df1
-cart2=rpart(poisox~ age+sex, data=df1_c ,method='class')
+#control = rpart.control(minbucket = 2)
+df1_c=df0
+df0
+cart2=rpart(poisox~ age+sex, data=df1_c ,method='poisson')
+summary(cart2)
+cart2$control
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df1_c %>% head()
+# for (i in 1:nrow(df1) ){
+#   if (df1$poisox[i]=="1"){
+#     df1_c[i,"ps2"]=cart_ps2[i,"1"]
+#     df1_c[i,"trt"]=1}
+#   else{
+#     df1_c[i,"ps2"]=cart_ps2[i,"0"]
+#     df1_c[i,"trt"]=0
+#   }
+# }
+
+#for (i in 1:nrow(df1) ){df1_c[i,"ps2"]=cart_ps2[i,"1"]}
+
+df1_c[,"ps2"]=cart_ps2
+
+df1_c %>% head()
+sum(df1_c$ps2==0|df1_c$ps2==1)
+```
+
+```{r}
+df1_c=df3
+df1
+
+?rpart
+cart2=rpart(poisox~ age+sex+blood_diff, data=df1_c ,method='class')
 summary(cart2)
 
 
@@ -188,14 +226,77 @@ for (i in 1:nrow(df1) ){
     df1_c[i,"ps2"]=cart_ps2[i,"1"]
     df1_c[i,"trt"]=1}
   else{
-    df1_c[i,"ps2"]=cart_ps2[i,"0"]
+    df1_c[i,"ps2"]=cart_ps2[i,"1"]
     df1_c[i,"trt"]=0
   }
 }
 df1_c %>% head()
 
 ```
+#-------------------------------
 
+```{r}
+#c. propensity score estimation- CART by package
+
+cart2=ps_cart(poisox ~ age + sex+blood_diff, data = df3)
+cart_ps2=estimate_ps(cart2)
+df3["propensity score"]=cart_ps2
+df3 %>% head()
+
+```
+```{r}
+# d. Add ipw_weight & calculate ATE_ipw
+df1_c %>% head(30)
+# for (i in 1:nrow(df1) ){
+#   if (df1$poisox[i]=="1"){
+#     df1[i,"propensity score2"]=cart_ps2[i,"0"]}
+#   else{df1[i,"propensity score2"]=cart_ps2[i,"1"]}
+# }
+zi=df1_c$poisox
+yi=df1_c$mortal
+e=df1_c$ps2
+
+
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
+
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+```
+
+
+
+```{r}
+# d. calculate ATE_sipw
+
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+
+```
+
+
+
+## Evaluate
+```{r}
+cov_balance_c=data.frame(rep(0),row.names = "CART")
+
+df0 %>% head()
+for(i in colnames(df0)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df0[i]*df1_c$ipw_wt)[df0$poisox==1,])
+    c_weighted_mean=mean((df0[i]*df1_c$ipw_wt)[df0$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df0[i]*df1_c$ipw_wt)[df0$poisox==1,])
+    cov_balance_c[i]=asam
+  }
+}
+cov_balance_c=cov_balance_c[,-1]
+cov_balance_c
+cov_balance_c$ASAM=apply(cov_balance_c,1,mean)
+cov_balance_c["ASAM"]
+```
+#--------------------------------
 
 ```{r}
 #c. propensity score estimation- CART by package
@@ -234,6 +335,9 @@ ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
 ATE_sipw_cart
 
 ```
+
+
+
 ## Evaluate
 ```{r}
 cov_balance_c=data.frame(rep(0),row.names = "CART")

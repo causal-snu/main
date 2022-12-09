@@ -1,0 +1,101 @@
+---
+title: "CI-project-chemical-cart"
+output: html_document
+date: '2022-12-08'
+---
+
+```{r}
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+## Data
+```{r}
+df<-read.table('/Users/kyungseonlee/Desktop/causal/poisox.txt')
+colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
+df%>% head()
+
+df3=df
+df3$blood_diff=df3$subseq-df3$prior
+df3=df3[c(1,2,4,6,7)]
+df3 %>% head()
+
+```
+
+```{r}
+library(rpart)
+
+#control = rpart.control(minbucket = 2)
+df1_c=df3
+df1_c %>% head(5)
+
+cart2=rpart(poisox~ age+sex+blood_diff, data=df1_c ,method='poisson')
+summary(cart2)
+cart2$control
+
+cart_ps2=predict(cart2)
+cart_ps2 %>% head()
+df1_c[,"ps2"]=cart_ps2
+
+df1_c %>% head()
+
+sum(df1_c$ps2==0|df1_c$ps2==1)
+```
+```{r}
+#install.packages("rpart.plot")
+
+library(rpart.plot)
+
+prp(cart2, type=4, extra=2, digits=3) 
+```
+
+```{r}
+zi=df1_c$poisox
+yi=df1_c$mortal
+e=df1_c$ps2
+
+
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
+
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+```
+
+```{r}
+
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+```
+
+```{r}
+cov_balance_c=data.frame(rep(0),row.names = "CART")
+
+df3%>% head()
+for(i in colnames(df3)){
+  if(i!="poisox" & i!="mortal"){
+#    print(df1[i])
+    t_weighted_mean=mean((df3[i]*df1_c$ipw_wt)[df3$poisox==1,])
+    c_weighted_mean=mean((df3[i]*df1_c$ipw_wt)[df3$poisox==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df3[i]*df1_c$ipw_wt)[df3$poisox==1,])
+    cov_balance_c[i]=asam
+  }
+}
+cov_balance_c=cov_balance_c[,-1]
+cov_balance_c
+cov_balance_c$ASAM=apply(cov_balance_c,1,mean)
+cov_balance_c["ASAM"]
+```
+
+```{r}
+
+```
+
+
+
+
+
+

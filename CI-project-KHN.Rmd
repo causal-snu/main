@@ -1,0 +1,353 @@
+---
+title: "Causal_project"
+output: html_document
+date: '2022-11-15'
+---
+## Install packages & library
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+
+```
+
+
+## Korea National Health and Nutrition Examination Survey Dataset
+## 1. Data reading
+```{r}
+
+raw_data <- read.sas7bdat("/Users/kyungseonlee/snu-causal/main/input/rawdata/HN20_ALL.sas7bdat")
+dim(raw_data) %>% head()
+#raw_data %>% head(1)
+
+```
+
+# 2. Data preprocessing
+```{r}
+column=c('sex','age','BD1','HE_ast','HE_alt',"HE_BMI",'DK8_dg','DK9_dg')
+#column2=c('BD1','DC2_dg','DK8_dg','DK9_dg','DK4_dg')
+
+df=raw_data[,column]
+df %>% head(7)
+
+sum(df[,c(8)])
+```
+
+
+## Missing value deletion
+```{r}
+for(i in 3:ncol(df)){
+  if(i==4|i==5|i==6){
+    df<- df[!( is.na(df[,i])), ]
+  }else{
+    df<- df[!(df[,i] == 8 |df[,i] == 9 | is.na(df[,i])), ]
+  }
+}
+for (i in 1:nrow(df)){
+  if (df[i,7]+df[i,8]==0){df[i,9]=0}else{df[i,9]=1}
+}
+df %>% head(20)
+sum(is.na(df))
+dim(df)
+```
+
+
+```{r}
+# First topic: Hepatitis causal inference
+df1=df[,c(-7,-8)]
+colnames(df1)[3:ncol(df1)]=c("treat","ast","alt","bmi","outcome")
+
+df1 %>% head(7)
+
+```
+## Diabetes & Drinking
+
+```{r}
+df1$treat<-df1$treat-1
+df1$sex<-df1$sex-1
+
+df1 %>% head(7)
+
+table(df1$treat,df1$outcome)
+
+# (df1$DC8_dg==0)
+# sum(is.na(df1$treat))
+# sum(is.na(df1$outcome))
+# dim(df1)
+# which(df1$treat==0) %>% head()
+```
+
+## Propensity score estimation- logistic regression, random Forest, CART
+
+## 1. Logistic Regression
+### 1-a. LR-ps estimation
+```{r}
+#logsitic regression
+df1_lo=df1
+df1_lo %>% head(10)
+
+log_reg_ps=glm(treat~ .-outcome, family = "binomial", data=df1)
+logit_e_hat=predict(log_reg_ps)
+print(logit_e_hat %>% head())
+
+lo_ps=exp(logit_e_hat)/(1+exp(logit_e_hat))
+print(lo_ps %>% head())
+
+df1_lo[,"ps"]=lo_ps
+# 
+# for (i in 1:nrow(df1_lo) ){
+#   if (df1_lo$treat[i]==1){
+#     df1_lo[i,"ps"]=lo_ps[i]
+#   }
+#   else{
+#     df1_lo[i,"ps"]=lo_ps[i]
+#   }
+# }
+df1_lo %>% head()
+```
+
+### 1-b. LR-weighting
+
+```{r}
+zi=df1_lo$treat
+yi=df1_lo$outcome
+e=df1_lo$ps
+
+df1_lo["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_lo %>% head()
+
+ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log
+
+ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log
+
+```
+### 1-c. LR-Evaluate
+
+```{r}
+cov_balance_lo=data.frame(rep(0),row.names = "logistic regression")
+
+for(i in colnames(df1)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df1[i]*df1_lo$ipw_wt)[df1$treat==1,])
+    c_weighted_mean=mean((df1[i]*df1_lo$ipw_wt)[df1$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df1[i]*df1_lo$ipw_wt)[df1$treat==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo$ASAM=apply(cov_balance_lo,1,mean)
+cov_balance_lo["ASAM"]
+
+```
+
+## 2. Random Forest
+### 2-a. RF-ps estimation
+```{r}
+library(randomForest)
+df1_rf=df1
+
+rf=randomForest(treat~ .-outcome, data=df1)
+rf_ps=predict(rf)
+print(rf_ps %>% head())
+
+df1_rf[,"ps"]=rf_ps
+
+# for (i in 1:nrow(df1_rf) ){
+#   if (df1_rf$treat[i]==1){
+#     df1_rf[i,"ps"]=rf_ps[i]
+#   }
+#   else{
+#     df1_rf[i,"ps"]=rf_ps[i]
+#   }
+# }
+df1_rf %>% head()
+```
+
+### 2-b. RF-weighting
+
+```{r}
+zi=df1_rf$treat
+yi=df1_rf$outcome
+e=df1_rf$ps
+
+df1_rf["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_rf %>% head()
+
+#ATE estimation
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf
+```
+
+### 2-c. RF-Evaluation
+```{r}
+
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+for(i in colnames(df1)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df1[i]*df1_rf$ipw_wt)[df1$treat==1,])
+    c_weighted_mean=mean((df1[i]*df1_rf$ipw_wt)[df1$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df1[i]*df1_rf$ipw_wt)[df1$treat==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf
+cov_balance_rf$ASAM=apply(cov_balance_rf,1,mean)
+cov_balance_rf["ASAM"]
+```
+## 3. CART
+### 3-a. CART-ps estimation
+```{r}
+#install.packages("rpart")
+library(rpart)
+
+# cart=rpart(poisox~ .-outcome, data=df10 ,method='poisson')
+# summary(cart)
+# 
+# df10_c=df10
+# cart_ps=predict(cart)
+# df10_c["propensity score"]=cart_ps
+# df10_c %>% head()
+# 
+# df11_c=df11
+
+df1_c=df1
+df1_c %>% head(5)
+
+cart=rpart(treat~ .-outcome, data=df1_c ,method='poisson',control = rpart.control(maxdepth = 5))
+#summary(cart2)
+cart$cptable
+
+cart_ps=predict(cart)
+cart_ps %>% head()
+df1_c[,"ps"]=cart_ps
+
+df1_c %>% head()
+
+sum(df1_c$ps==0|df1_c$ps==1)
+
+#df1_c[65:70,]
+```
+
+
+```{r}
+#install.packages("rpart.plot")
+
+library(rpart.plot)
+
+prp(cart, type=4, extra=2, digits=3) 
+```
+### 3-b. CART-weighting
+
+```{r}
+#add weighting- CART
+zi=df1_c$treat
+yi=df1_c$outcome
+e=df1_c$ps
+
+df1_c["ipw_wt"]= zi/e-(1-zi)/(1-e)
+df1_c %>% head()
+
+#ATE_ipw
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+
+#ATE_sipw
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+```
+
+### 3-c. CART-evaluation
+```{r}
+
+cov_balance_cart=data.frame(rep(0),row.names = "CART")
+
+for(i in colnames(df1)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df1[i]*df1_c$ipw_wt)[df1$treat==1,])
+    c_weighted_mean=mean((df1[i]*df1_c$ipw_wt)[df1$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df1[i]*df1_c$ipw_wt)[df1$treat==1,])
+    cov_balance_cart[i]=asam
+  }
+}
+cov_balance_cart=cov_balance_cart[,-1]
+cov_balance_cart$ASAM=apply(cov_balance_cart,1,mean)
+cov_balance_cart["ASAM"]
+```
+## Total ATE table
+
+```{r}
+ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+colnames(ATE_table)="ATE table in KHN Dataset"
+
+knitr :: kable(ATE_table,"simple")
+```
+
+```{r, results='asis'}
+
+#install.packages("knitr")
+
+```
+
+
+## Evaluation visualization - Chemical dataset
+### a. ASAM table
+```{r}
+ASAM_table2=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_cart["ASAM"])
+colnames(ASAM_table2)="ASAM in KHN Dataset"
+knitr::kable(ASAM_table2,"simple")
+```
+
+### b. ASAM box plot
+```{r}
+a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_cart))
+colnames(a)=c("LR","RF","CART")
+boxplot(a, main="ASAM in the KHN Dataset",horizontal = TRUE)
+```
+
+### c. ps distribution
+```{r}
+b=cbind(df1_lo["ps"],df1_rf["ps"],df1_c["ps"])
+colnames(b)=c("LR","RF","CART")
+boxplot(b,horizontal = TRUE,main="Propensity score distribution in the KHN Dataset")
+```
+
+### d. weight distribution
+```{r}
+par(mfcol=c(1,3))
+boxplot(df1_lo[(df1_lo$treat==0),"ipw_wt"],main="LR in KHN")
+boxplot(df1_rf[(df1_lo$treat==0),"ipw_wt"],main="RF in KHN")
+boxplot(df1_c[(df1_lo$treat==0),"ipw_wt"],main="CART in KHN")
+```
+
+```{r}
+sim=data.frame(c(0.094,0.075,0.143))
+colnames(sim)="ASAM in simulated dataset"
+rownames(sim)=c("logistic regression","Random Forest","CART")
+knitr :: kable(sim,"simple")
+```
+
+
