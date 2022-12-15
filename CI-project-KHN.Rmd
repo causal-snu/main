@@ -65,7 +65,7 @@ colnames(df1)[3:ncol(df1)]=c("treat","ast","alt","bmi","outcome")
 df1 %>% head(7)
 
 ```
-## Diabetes & Drinking
+
 
 ```{r}
 df1$treat<-df1$treat-1
@@ -242,6 +242,7 @@ df1_c %>% head()
 sum(df1_c$ps==0|df1_c$ps==1)
 
 #df1_c[65:70,]
+
 ```
 
 
@@ -344,8 +345,9 @@ boxplot(df1_c[(df1_lo$treat==0),"ipw_wt"],main="CART in KHN")
 ```
 
 ```{r}
-sim=data.frame(c(0.094,0.075,0.143))
-colnames(sim)="ASAM in simulated dataset"
+sim=data.frame("data A"=c(0.041,0.08,0.159),
+               "data G"=c(0.094,0.075,0.143))
+#colnames(sim)="ASAM in simulated dataset"
 rownames(sim)=c("logistic regression","Random Forest","CART")
 knitr :: kable(sim,"simple")
 ```

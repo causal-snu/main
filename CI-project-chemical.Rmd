@@ -35,7 +35,6 @@ df0 %>% head()
 ```
 ## Propensity score estimation- logistic regression, random Forest, CART
 
-
 ## 1. Logistic Regression
 ### 1-a. LR-ps estimation
 ```{r}
@@ -97,15 +96,16 @@ cov_balance_lo["ASAM"]
 
 #install.packages("randomForest")
 library(randomForest)
+
+?randomForest
+
 rf=randomForest(poisox~ age+sex+blood_diff, data=df3)
 rf_ps=predict(rf)
 print(rf_ps %>% head())
 
 df_rf=df3
 
-for (i in 1:nrow(df_rf) ){
-  df_rf[i,"ps"]=rf_ps[i]
-}
+df_rf[,"ps"]=rf_ps
 df_rf %>% head()
 
 ```
@@ -159,7 +159,7 @@ library(rpart)
 df1_c=df3
 df1_c %>% head(5)
 
-cart2=rpart(poisox~ age+sex+blood_diff+blood_diff, data=df1_c ,method='poisson',control = rpart.control(maxdepth = 3))
+cart2=rpart(poisox~ age+sex+blood_diff+blood_diff, data=df1_c ,method='poisson',control = rpart.control(maxdepth = 1))
 #summary(cart2)
 cart2$cptable
 

@@ -1,0 +1,276 @@
+---
+title: "CI-project-lalonde"
+output: html_document
+date: '2022-12-15'
+---
+## Install packages & library
+```{r}
+#install.packages("remotes")
+#remotes::install_github("ygeunkim/propensityml")
+#install.packages("dplyr")
+#install.packages("sas7bdat")
+#install.packages("MatchIt")
+#install.packages("survey")
+#install.packages("tableone")
+
+library(propensityml)
+library(dplyr)
+library(sas7bdat)
+library(MatchIt)
+
+library(ggplot2) 
+library(moonBook) 
+library(survey)
+library(tableone)
+```
+# LaLonde Dataset
+### 직업훈련프로그램(treat)를 들은 사람의 수입(outcome='re78')이 더 높은가?
+## Data reading
+```{r}
+df<-lalonde
+colnames(df)[9]<-"outcome"
+df %>% head()
+dim(df)
+
+```
+## Propensity score estimation- logistic regression, random Forest, CART
+
+## 1. Logistic Regression
+### 1-a. LR-ps estimation
+```{r}
+df_lo=df
+
+log_reg_ps=glm(treat~ .-outcome, family = "binomial", data=df)
+df_lo$ps=log_reg_ps$fitted.values
+df_lo %>% head()
+
+```
+### 1-b. LR-weighting
+```{r}
+zi=df_lo$treat
+yi=df_lo$outcome
+e=df_lo$ps
+
+df_lo$w= zi/e-(1-zi)/(1-e)
+df_lo %>% head()
+```
+
+
+```{r}
+ATE_ipw_log=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_log
+
+ATE_sipw_log=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_log
+
+```
+### 1-c. LR-Evaluate
+### 가중치 부여 전후 propensity score 분포 차이 비교.
+```{r}
+par(mfcol=c(1,2))
+ggplot(data=df_lo, aes(x=ps))+geom_density(aes(fill=factor(treat)),alpha=0.3)
+
+ggplot(data=df_lo, aes(x=ps, weight=w))+geom_density(aes(fill=factor(treat)),alpha=0.3) 
+```
+
+```{r}
+cov_balance_lo=data.frame(rep(0),row.names = "Logistic Regression")
+
+for(i in colnames(df)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df[i]*df_lo$w)[df$treat==1,])
+    c_weighted_mean=mean((df[i]*df_lo$w)[df$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df[i]*df_lo$w)[df$treat==1,])
+    cov_balance_lo[i]=asam
+  }
+}
+cov_balance_lo=cov_balance_lo[,-1]
+cov_balance_lo
+cov_balance_lo$ASAM=apply(cov_balance_lo,1,mean)
+cov_balance_lo["ASAM"]
+```
+## 2. Random Forest
+### 2-a. RF-ps estimation
+```{r}
+
+#install.packages("randomForest")
+library(randomForest)
+df_rf=df
+
+?randomForest
+
+rf=randomForest(treat~ .-outcome, data=df)
+df_rf$ps=predict(rf)
+df_rf %>% head()
+
+```
+
+### 2-b. RF-weighting
+```{r}
+
+zi=df_rf$treat
+yi=df_rf$outcome
+e=df_rf$ps
+
+df_rf["w"]= zi/e-(1-zi)/(1-e)
+df_rf %>% head()
+
+ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_rf
+
+ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_rf
+
+
+```
+### 2-c. RF-Evaluation
+### 가중치 부여 전후 propensity score 분포 차이 비교.
+```{r}
+par(mfcol=c(1,2))
+ggplot(data=df_rf, aes(x=ps))+geom_density(aes(fill=factor(treat)),alpha=0.3)
+
+ggplot(data=df_rf, aes(x=ps, weight=w))+geom_density(aes(fill=factor(treat)),alpha=0.3) 
+```
+
+```{r}
+cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
+
+df %>% head()
+for(i in colnames(df)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df[i]*df_rf$w)[df$treat==1,])
+    c_weighted_mean=mean((df[i]*df_rf$w)[df$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df[i]*df_rf$w)[df$treat==1,])
+    cov_balance_rf[i]=asam
+  }
+}
+cov_balance_rf=cov_balance_rf[,-1]
+cov_balance_rf
+cov_balance_rf$ASAM=apply(cov_balance_rf,1,mean)
+cov_balance_rf["ASAM"]
+```
+
+## 3. CART
+### 3-a. CART-ps estimation
+
+```{r}
+library(rpart)
+
+#control = rpart.control(minbucket = 2)
+df_c<-df
+
+cart=rpart(treat~ .-outcome, data=df_c ,method='poisson',control = rpart.control(minbucket=40))
+#summary(cart2)
+cart$cptable
+df_c$ps<-predict(cart)
+
+df_c %>% head()
+
+sum(df_c$ps==0|df_c$ps==1)
+```
+
+```{r}
+#install.packages("rpart.plot")
+
+library(rpart.plot)
+
+prp(cart, type=4, extra=2, digits=3) 
+```
+### 3-b. CART-weighting
+```{r}
+zi=df_c$treat
+yi=df_c$outcome
+e=df_c$ps
+
+
+df_c["w"]= zi/e-(1-zi)/(1-e)
+df_c %>% head()
+
+ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ATE_ipw_cart
+```
+
+```{r}
+
+ATE_sipw_cart=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
+ATE_sipw_cart
+```
+### 3-c. CART-evaluation
+### 가중치 부여 전후 propensity score 분포 차이 비교.
+```{r}
+par(mfcol=c(1,2))
+ggplot(data=df_c, aes(x=ps))+geom_density(aes(fill=factor(treat)),alpha=0.3)
+
+ggplot(data=df_c, aes(x=ps, weight=w))+geom_density(aes(fill=factor(treat)),alpha=0.3) 
+```
+
+```{r}
+cov_balance_c=data.frame(rep(0),row.names = "CART")
+
+df%>% head()
+for(i in colnames(df)){
+  if(i!="treat" & i!="outcome"){
+#    print(df1[i])
+    t_weighted_mean=mean((df[i]*df_c$w)[df$treat==1,])
+    c_weighted_mean=mean((df[i]*df_c$w)[df$treat==0,])
+    weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
+    asam=weighted_mean_diff/sd((df[i]*df_c$w)[df$treat==1,])
+    cov_balance_c[i]=asam
+  }
+}
+cov_balance_c=cov_balance_c[,-1]
+cov_balance_c
+cov_balance_c$ASAM=apply(cov_balance_c,1,mean)
+cov_balance_c["ASAM"]
+```
+
+## Total ATE table
+```{r}
+ATE_table= rbind(ATE_ipw_log,
+      ATE_sipw_log,
+      ATE_ipw_rf,
+      ATE_sipw_rf,
+      ATE_ipw_cart, 
+      ATE_sipw_cart)
+
+colnames(ATE_table)="ATE table in LaLonde Dataset"
+knitr :: kable(ATE_table,"simple")
+```
+
+## Evaluation visualization - LaLonde dataset
+### a. ASAM table
+```{r}
+ASAM_table1=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_c["ASAM"])
+colnames(ASAM_table1)="ASAM in LaLonde Dataset"
+knitr::kable(ASAM_table1,"simple")
+```
+
+### b. ASAM box plot
+```{r}
+a=cbind(t(cov_balance_lo) ,t(cov_balance_rf) ,t(cov_balance_c))
+colnames(a)=c("LR","RF","CART")
+boxplot(a, main="ASAM in the LaLonde Dataset",horizontal = TRUE)
+```
+
+### c. ps distribution 
+
+
+```{r}
+b=cbind(df_lo["ps"],df_rf["ps"],df_c["ps"])
+colnames(b)=c("LR","RF","CART")
+boxplot(b,horizontal = TRUE,main="Propensity score distribution in the LaLonde Dataset")
+```
+
+### d. weight distribution
+```{r}
+par(mfcol=c(1,3))
+boxplot(df_lo[(df$treat==0),"w"],main="LR in LaLonde")
+boxplot(df_rf[(df$treat==0),"w"],main="RF in LaLonde")
+boxplot(df_c[(df$treat==0),"w"],main="CART in LaLonde")
+
+```
+
