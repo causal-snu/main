@@ -159,7 +159,9 @@ library(rpart)
 df1_c=df3
 df1_c %>% head(5)
 
-cart2=rpart(poisox~ age+sex+blood_diff+blood_diff, data=df1_c ,method='poisson',control = rpart.control(maxdepth = 1))
+?rpart.control
+
+cart2=rpart(poisox~ age+sex+blood_diff+blood_diff, data=df1_c ,method='poisson',control = rpart.control(minbucket=400))
 #summary(cart2)
 cart2$cptable
 
@@ -262,4 +264,6 @@ boxplot(df_rf[(df3$poisox==0),"ipw_wt"],main="RF in Chemical")
 boxplot(df1_c[(df3$poisox==0),"ipw_wt"],main="CART in Chemical")
 
 ```
+
+
 

@@ -51,7 +51,7 @@ zi=df_lo$treat
 yi=df_lo$outcome
 e=df_lo$ps
 
-df_lo$w= zi/e-(1-zi)/(1-e)
+df_lo$w<-ifelse(df_lo$treat==1,1/df_lo$ps,1/(1-df_lo$ps))
 df_lo %>% head()
 ```
 
@@ -75,9 +75,10 @@ ggplot(data=df_lo, aes(x=ps, weight=w))+geom_density(aes(fill=factor(treat)),alp
 
 ```{r}
 cov_balance_lo=data.frame(rep(0),row.names = "Logistic Regression")
+summary(df[,4])
 
 for(i in colnames(df)){
-  if(i!="treat" & i!="outcome"){
+  if(i!="treat" & i!="outcome" &i!="race"){
 #    print(df1[i])
     t_weighted_mean=mean((df[i]*df_lo$w)[df$treat==1,])
     c_weighted_mean=mean((df[i]*df_lo$w)[df$treat==0,])
@@ -114,7 +115,7 @@ zi=df_rf$treat
 yi=df_rf$outcome
 e=df_rf$ps
 
-df_rf["w"]= zi/e-(1-zi)/(1-e)
+df_rf$w<-ifelse(df_rf$treat==1,1/df_rf$ps,1/(1-df_rf$ps))
 df_rf %>% head()
 
 ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
@@ -139,7 +140,7 @@ cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
 
 df %>% head()
 for(i in colnames(df)){
-  if(i!="treat" & i!="outcome"){
+  if(i!="treat" & i!="outcome"&i!="race"){
 #    print(df1[i])
     t_weighted_mean=mean((df[i]*df_rf$w)[df$treat==1,])
     c_weighted_mean=mean((df[i]*df_rf$w)[df$treat==0,])
@@ -163,7 +164,7 @@ library(rpart)
 #control = rpart.control(minbucket = 2)
 df_c<-df
 
-cart=rpart(treat~ .-outcome, data=df_c ,method='poisson',control = rpart.control(minbucket=40))
+cart=rpart(treat~ .-outcome, data=df_c ,method='poisson',control = rpart.control(minsplit=40))
 #summary(cart2)
 cart$cptable
 df_c$ps<-predict(cart)
@@ -187,7 +188,7 @@ yi=df_c$outcome
 e=df_c$ps
 
 
-df_c["w"]= zi/e-(1-zi)/(1-e)
+df_c$w<-ifelse(df_c$treat==1,1/df_c$ps,1/(1-df_c$ps))
 df_c %>% head()
 
 ATE_ipw_cart=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
@@ -213,7 +214,7 @@ cov_balance_c=data.frame(rep(0),row.names = "CART")
 
 df%>% head()
 for(i in colnames(df)){
-  if(i!="treat" & i!="outcome"){
+  if(i!="treat" & i!="outcome"&i!="race"){
 #    print(df1[i])
     t_weighted_mean=mean((df[i]*df_c$w)[df$treat==1,])
     c_weighted_mean=mean((df[i]*df_c$w)[df$treat==0,])
@@ -245,6 +246,7 @@ knitr :: kable(ATE_table,"simple")
 ### a. ASAM table
 ```{r}
 ASAM_table1=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_c["ASAM"])
+ASAM_table1
 colnames(ASAM_table1)="ASAM in LaLonde Dataset"
 knitr::kable(ASAM_table1,"simple")
 ```
