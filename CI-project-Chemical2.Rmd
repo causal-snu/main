@@ -1,8 +1,9 @@
 ---
-title: "CI-project-lalonde"
+title: "CI-project-Chemical2"
 output: html_document
 date: '2022-12-15'
 ---
+
 ## Install packages & library
 ```{r}
 #install.packages("remotes")
@@ -27,9 +28,13 @@ library(tableone)
 ### 직업훈련프로그램(treat)를 들은 사람의 수입(outcome='re78')이 더 높은가?
 ## Data reading
 ```{r}
-df<-lalonde
-colnames(df)
-colnames(df)[9]<-"outcome"
+df<-read.table('/Users/kyungseonlee/Desktop/causal/poisox.txt')
+colnames(df)=c('age','sex','prior','poisox','subseq','mortal')
+
+df$blood_diff=df$subseq-df$prior
+df=df[,-3]
+
+colnames(df)[c(3,5)]<-c("treat","outcome")
 df %>% head()
 dim(df)
 
@@ -43,6 +48,7 @@ df_lo=df
 
 log_reg_ps=glm(treat~ .-outcome, family = "binomial", data=df)
 df_lo$ps=log_reg_ps$fitted.values
+
 df_lo %>% head()
 
 ```
@@ -76,17 +82,15 @@ ggplot(data=df_lo, aes(x=ps, weight=w))+geom_density(aes(fill=factor(treat)),alp
 
 ```{r}
 cov_balance_lo=data.frame(rep(0),row.names = "Logistic Regression")
-summary(df[,4])
 
 for(i in colnames(df)){
-  if(i!="treat" & i!="outcome" &i!="race"){
+  if(i!="treat" & i!="outcome"){
 #    print(df1[i])
-    cov_balance_lo$before[i]=abs(mean((df[df$treat==1,i]))-mean((df[df$treat==0,i])))
     t_weighted_mean=mean((df[i]*df_lo$w)[df$treat==1,])
     c_weighted_mean=mean((df[i]*df_lo$w)[df$treat==0,])
     weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
     asam=weighted_mean_diff/sd((df[i]*df_lo$w)[df$treat==1,])
-    cov_balance_lo$after[i]=asam
+    cov_balance_lo[i]=asam
   }
 }
 cov_balance_lo=cov_balance_lo[,-1]
@@ -99,15 +103,15 @@ cov_balance_lo["ASAM"]
 ```{r}
 
 #install.packages("randomForest")
+
 library(randomForest)
 df_rf=df
-
-?randomForest
-
-rf=randomForest(treat~ .-outcome, data=df)
+rf=randomForest(treat~ .-treat-outcome, data=df_rf,ntree=100, type= "regression")
 df_rf$ps=predict(rf)
-df_rf %>% head()
 
+sum(df_rf$ps==1)
+
+df_rf$ps %>% head()
 ```
 
 ### 2-b. RF-weighting
@@ -120,7 +124,7 @@ e=df_rf$ps
 df_rf$w<-ifelse(df_rf$treat==1,1/df_rf$ps,1/(1-df_rf$ps))
 df_rf %>% head()
 
-ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
+ ATE_ipw_rf=mean(zi*yi/e)-mean((1-zi)*yi/(1-e))
 ATE_ipw_rf
 
 ATE_sipw_rf=sum(zi*yi/e)/sum(zi/e)-sum((1-zi)*yi/(1-e))/sum((1-zi)/(1-e))
@@ -142,14 +146,13 @@ cov_balance_rf=data.frame(rep(0),row.names = "Random Forest")
 
 df %>% head()
 for(i in colnames(df)){
-  if(i!="treat" & i!="outcome"&i!="race"){
+  if(i!="treat" & i!="outcome"){
 #    print(df1[i])
-    cov_balance_rf$before[i]=abs(mean((df[df$treat==1,i]))-mean((df[df$treat==0,i])))
     t_weighted_mean=mean((df[i]*df_rf$w)[df$treat==1,])
     c_weighted_mean=mean((df[i]*df_rf$w)[df$treat==0,])
     weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
     asam=weighted_mean_diff/sd((df[i]*df_rf$w)[df$treat==1,])
-    cov_balance_rf$after[i]=asam
+    cov_balance_rf[i]=asam
   }
 }
 cov_balance_rf=cov_balance_rf[,-1]
@@ -167,7 +170,10 @@ library(rpart)
 #control = rpart.control(minbucket = 2)
 df_c<-df
 
-cart=rpart(treat~ .-outcome, data=df_c ,method='poisson',control = rpart.control(minsplit=40))
+cart=rpart(treat~ .-outcome, 
+           data=df_c ,
+           method='poisson',
+           control = rpart.control(minsplit = 30))
 #summary(cart2)
 cart$cptable
 df_c$ps<-predict(cart)
@@ -217,14 +223,13 @@ cov_balance_c=data.frame(rep(0),row.names = "CART")
 
 df%>% head()
 for(i in colnames(df)){
-  if(i!="treat" & i!="outcome"&i!="race"){
+  if(i!="treat" & i!="outcome"){
 #    print(df1[i])
-    cov_balance_c$before[i]=abs(mean((df[df$treat==1,i]))-mean((df[df$treat==0,i])))
     t_weighted_mean=mean((df[i]*df_c$w)[df$treat==1,])
     c_weighted_mean=mean((df[i]*df_c$w)[df$treat==0,])
     weighted_mean_diff=abs(t_weighted_mean-c_weighted_mean)
     asam=weighted_mean_diff/sd((df[i]*df_c$w)[df$treat==1,])
-    cov_balance_c$after[i]=asam
+    cov_balance_c[i]=asam
   }
 }
 cov_balance_c=cov_balance_c[,-1]
@@ -250,7 +255,6 @@ knitr :: kable(ATE_table,"simple")
 ### a. ASAM table
 ```{r}
 ASAM_table1=rbind(cov_balance_lo["ASAM"] ,cov_balance_rf["ASAM"] ,cov_balance_c["ASAM"])
-ASAM_table1
 colnames(ASAM_table1)="ASAM in LaLonde Dataset"
 knitr::kable(ASAM_table1,"simple")
 ```
@@ -279,4 +283,3 @@ boxplot(df_rf[(df$treat==0),"w"],main="RF in LaLonde")
 boxplot(df_c[(df$treat==0),"w"],main="CART in LaLonde")
 
 ```
-
